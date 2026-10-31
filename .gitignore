@@ -1,0 +1,14 @@
+.venv/
+trabajos/
+cache/
+logs/
+.port
+config.json
+.pid
+pruebas/casos/
+__pycache__/
+*.pyc
+.DS_Store
+Flamenco Dreams Guitar V2/
+plugin/
+server.log

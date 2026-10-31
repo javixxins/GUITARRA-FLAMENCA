@@ -1,0 +1,9 @@
+* text=auto
+*.bat text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+"Guitarra Flamenca.app/Contents/MacOS/launcher" text eol=lf
+*.png binary
+*.ico binary
+*.icns binary

@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guitarra Flamenca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#120d0a; --panel:#1c1511; --panel2:#251b15; --line:#3a2b20;
+  --text:#f3e9dd; --muted:#b9a690; --gold:#d19d61; --gold2:#e8b878; --red:#b8322a; --ok:#6fae6a;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif}
+h1,h2{font-family:Fraunces,Georgia,serif;font-weight:700;margin:0}
+a{color:var(--gold2)}
+.hero{position:relative;min-height:190px;display:flex;align-items:flex-end;padding:28px 24px;
+  background:linear-gradient(180deg,rgba(18,13,10,.1),var(--bg) 96%),linear-gradient(90deg,var(--bg) 0,rgba(18,13,10,.92) 16%,rgba(18,13,10,0) 45%),url(/fondo.jpg) right 72%/cover,#2a1c12}
+.hero h1{font-size:clamp(28px,5vw,44px);letter-spacing:.3px}
+.hero p{margin:4px 0 0;color:var(--muted)}
+main{max-width:980px;margin:0 auto;padding:8px 16px 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
+.step{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.step b{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--gold);color:#1a120c;font-weight:600}
+.step h2{font-size:20px}
+.muted{color:var(--muted)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--gold);background:var(--panel2)}
+.drop strong{color:var(--gold2)}
+.file{display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+.file.show{display:flex}
+.file .name{font-weight:600}
+audio{width:100%;height:40px;filter:sepia(.3)}
+.sounds{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.sound{position:relative;background:var(--panel2);border:2px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;transition:.15s}
+.sound:hover{border-color:#5a4230}
+.sound.sel{border-color:var(--gold);box-shadow:0 0 0 3px rgba(209,157,97,.18)}
+.sound h3{margin:0 0 2px;font-size:16px}
+.sound .sub{font-size:12px;color:var(--gold2)}
+.sound p{font-size:13px;color:var(--muted);margin:8px 0 10px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:9px 14px;font:inherit;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--gold)}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn.primary{background:var(--gold);color:#1a120c;border-color:var(--gold);font-weight:600}
+.btn.primary:hover{background:var(--gold2)}
+.btn.big{font-size:17px;padding:13px 26px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.playing{border-color:var(--gold);color:var(--gold2)}
+details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;color:var(--gold2);font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px 22px;margin-top:12px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.ctl label span{color:var(--text)}
+.ctl small{display:block;font-size:12px;color:#8d7a66}
+input[type=range]{width:100%;accent-color:var(--gold)}
+select,input[type=text]{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+.mix{display:none;margin-top:12px;gap:22px}
+.mix.show{display:grid;grid-template-columns:1fr 1fr}
+.go{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.bar{height:16px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:16px}
+.bar div{height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--gold));transition:width .3s}
+.status{display:flex;justify-content:space-between;margin-top:6px;font-size:14px;color:var(--muted)}
+.status .pct{color:var(--gold2);font-weight:600}
+.err{color:#ff8f84}
+#result{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px}
+.chip b{color:var(--gold2);font-weight:600}
+canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);border-radius:10px;display:block}
+.players{display:grid;gap:12px;margin-top:14px}
+.player{display:grid;grid-template-columns:200px 1fr auto;align-items:center;gap:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.player .t{font-weight:600}
+.player .t small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.save{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px}
+.checks{display:flex;gap:18px;margin:12px 0;flex-wrap:wrap}
+.checks label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.saved{margin-top:12px;font-size:14px}
+.saved div{color:var(--ok)}
+.hint{font-size:13px;color:var(--muted);margin-top:8px}
+.warn{background:#3a1d17;border:1px solid #7a3326;border-radius:10px;padding:12px;margin-top:18px;display:none}
+.transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.transport input{flex:1;min-width:160px}
+.mxTime{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px;min-width:92px;text-align:right}
+.track{display:grid;grid-template-columns:14px minmax(150px,1.3fr) auto minmax(140px,2fr) minmax(90px,1fr) auto;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px}
+.track.off{opacity:.5}
+.track .dot{width:12px;height:12px;border-radius:50%}
+.track .nm{font-weight:600;font-size:14px;line-height:1.25}
+.track .nm small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.track .ms{display:flex;gap:4px}
+.track .ms button{width:30px;height:28px;border-radius:7px;border:1px solid var(--line);background:#1a130e;color:var(--muted);font:600 12px Inter;cursor:pointer}
+.track .ms button.m.on{background:#7a3326;color:#fff;border-color:#a2473a}
+.track .ms button.s.on{background:var(--gold);color:#1a120c;border-color:var(--gold)}
+.track .vol label,.track .pan label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.track .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px}
+.track .x:hover{color:#ff8f84}
+.track.loading .nm small::after{content:' · cargando…'}
+.addrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.addrow select{width:auto;flex:1;min-width:200px}
+.masterrow{display:grid;grid-template-columns:minmax(200px,1fr) auto minmax(120px,1fr);gap:18px;align-items:center;margin-top:16px}
+.chk{display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer}
+.meter{height:10px;background:#0d0907;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.meter div{height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--gold) 70%,var(--red))}
+@media (max-width:760px){.track{grid-template-columns:14px 1fr auto auto}.track .vol,.track .pan{grid-column:2 / -1}.masterrow{grid-template-columns:1fr}}
+@media (max-width:640px){.player{grid-template-columns:1fr}.save{grid-template-columns:1fr}.mix.show{grid-template-columns:1fr}.hero{min-height:150px}}
+</style>
+</head>
+<body>
+<header class="hero"><div>
+  <h1>Guitarra Flamenca</h1>
+  <p>Convierte cualquier WAV en guitarra flamenca con los sonidos de <em>Flamenco Dreams Guitar V2</em>.</p>
+</div></header>
+<main>
+  <div class="warn" id="pluginWarn">
+    <b>Falta el plugin de guitarra.</b> <span id="pluginErr"></span>
+    <div class="muted" style="font-size:13px;margin-top:6px">La app usa las muestras del instrumento gratuito
+      <b>Flamenco Dreams Guitar V2</b> (Martin Andrew Smith, formato Decent Sampler). Descárgalo, descomprímelo
+      y elige su carpeta (la que contiene «Flamenco Dreams Guitar V2.dspreset»).</div>
+    <div class="save" style="grid-template-columns:1fr auto auto"><input type="text" id="pluginDir" placeholder="Carpeta «Flamenco Dreams Guitar V2»">
+    <button class="btn" id="pluginPick">Elegir carpeta…</button>
+    <button class="btn" id="pluginSet">Usar esta ruta</button></div>
+  </div>
+
+  <section class="card">
+    <div class="step"><b>1</b><h2>Sube tu archivo WAV</h2></div>
+    <label class="drop" id="drop">
+      <input type="file" id="fileIn" accept=".wav,audio/wav,audio/x-wav" hidden>
+      <div><strong>Arrastra aquí tu WAV</strong> o haz clic para elegirlo</div>
+      <div class="muted" style="font-size:13px;margin-top:4px">Melodías, acordes, piano, voz, varios instrumentos… se respetan todas las notas.</div>
+    </label>
+    <div class="file" id="fileBox">
+      <div><div class="name" id="fileName"></div><div class="muted" style="font-size:13px" id="fileMeta"></div></div>
+      <audio id="origPrev" controls style="flex:1;min-width:240px"></audio>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="step"><b>2</b><h2>Elige el sonido de guitarra</h2></div>
+    <div class="sounds" id="sounds"></div>
+    <div class="mix" id="mixBox">
+      <div class="ctl"><label>Guitarra de Estudio <span id="lv0v"></span></label><input type="range" id="lv0" min="0" max="1" step="0.05"></div>
+      <div class="ctl"><label>Guitarra de Escenario <span id="lv1v"></span></label><input type="range" id="lv1" min="0" max="1" step="0.05"></div>
+    </div>
+    <details>
+      <summary>Controles del plugin (volumen, tono, reverb, ataque, release)</summary>
+      <div class="grid" id="fxGrid"></div>
+    </details>
+    <details open>
+      <summary>Fidelidad y sonido de guitarra flamenca</summary>
+      <div class="hint">La app analiza la onda del original y copia su dinámica y parte de su timbre; después aplica filtros para que suene a una guitarra flamenca nítida, grabada limpia.</div>
+      <div class="grid" id="qualGrid"></div>
+    </details>
+    <details>
+      <summary>Detección de notas</summary>
+      <div class="grid" id="detGrid"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <div class="step"><b>3</b><h2>Convertir</h2></div>
+    <div class="go">
+      <button class="btn primary big" id="goBtn" disabled>Convertir a guitarra flamenca</button>
+      <span class="muted" id="goHint">Primero sube un archivo WAV.</span>
+    </div>
+    <div id="progBox" style="display:none">
+      <div class="bar"><div id="bar"></div></div>
+      <div class="status"><span id="msg"></span><span class="pct" id="pct">0 %</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="result">
+    <div class="step"><b>4</b><h2>Escucha el resultado</h2></div>
+    <div class="chips" id="chips"></div>
+    <canvas id="roll"></canvas>
+    <div class="players">
+      <div class="player"><div class="t">🎸 Guitarra flamenca (WAV)<small id="wavName"></small></div>
+        <audio id="aWav" controls preload="auto"></audio>
+        <a class="btn small" id="dlWav">Descargar</a></div>
+      <div class="player"><div class="t">🎹 Notas MIDI<small>Escucha de las notas del archivo .mid</small></div>
+        <audio id="aMid" controls preload="auto"></audio>
+        <a class="btn small" id="dlMid">Descargar</a></div>
+      <div class="player"><div class="t">🎧 Original<small>Para comparar</small></div>
+        <audio id="aOrig" controls preload="auto"></audio><span></span></div>
+    </div>
+    <div class="go" style="margin-top:14px" id="reBox" hidden>
+      <button class="btn" id="reBtn">Volver a generar con el sonido y ajustes actuales</button>
+      <span class="muted" style="font-size:13px">Has cambiado ajustes. Se reutilizan las notas ya detectadas, así que es más rápido.</span>
+    </div>
+
+    <div class="step" style="margin-top:30px"><b>5</b><h2>Mezclador de pistas</h2></div>
+    <p class="muted" style="margin:-6px 0 12px;font-size:14px">Mezcla la guitarra flamenca con la grabación original (o con otras versiones de guitarra) y regula cuánto se oye cada pista. Los cambios se escuchan al momento.</p>
+    <div class="transport">
+      <button class="btn primary" id="mxPlay" disabled>▶ Escuchar mezcla</button>
+      <button class="btn" id="mxStop" title="Volver al principio">⏮</button>
+      <input type="range" id="mxSeek" min="0" max="1" step="0.01" value="0">
+      <span class="mxTime" id="mxTime">0:00 / 0:00</span>
+    </div>
+    <div id="tracks"></div>
+    <div class="addrow">
+      <select id="addSel"></select>
+      <button class="btn" id="addBtn">＋ Añadir pista</button>
+      <button class="btn" id="newTrackBtn" title="Toca las mismas notas con el sonido y ajustes elegidos arriba y lo añade como pista nueva">＋ Nueva pista de guitarra con el sonido elegido arriba</button>
+    </div>
+    <div class="masterrow">
+      <div class="ctl"><label>Volumen general <span id="mxMasterV"></span></label><input type="range" id="mxMaster" min="0" max="1.5" step="0.01" value="1"></div>
+      <label class="chk"><input type="checkbox" id="mxNorm" checked> Normalizar al exportar (−1 dB, sin saturar)</label>
+      <div class="meter" title="Nivel de salida"><div id="mxMeter"></div></div>
+    </div>
+    <div class="go" style="margin-top:14px">
+      <button class="btn primary" id="mxExport">⬇ Exportar mezcla WAV</button>
+      <span class="muted" id="mxMsg" style="font-size:13px"></span>
+    </div>
+    <div class="player" id="mxResult" style="display:none;margin-top:12px">
+      <div class="t">🎚 Mezcla final (WAV)<small id="mxName"></small></div>
+      <audio id="aMix" controls preload="auto"></audio>
+      <a class="btn small" id="dlMix">Descargar</a>
+    </div>
+
+    <div class="step" style="margin-top:30px"><b>6</b><h2>Guardar en tu carpeta</h2></div>
+    <div class="ctl"><label>Nombre del archivo</label><input type="text" id="saveName"></div>
+    <div class="save">
+      <input type="text" id="folder" placeholder="Carpeta de destino">
+      <button class="btn" id="chooseBtn">📁 Elegir carpeta…</button>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="fWav" checked> WAV (audio de guitarra)</label>
+      <label><input type="checkbox" id="fMid" checked> MIDI (notas)</label>
+      <label><input type="checkbox" id="fMix"> Mezcla final del mezclador (WAV)</label>
+    </div>
+    <button class="btn primary" id="saveBtn">Guardar</button>
+    <div class="saved" id="saved"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let CFG = null, file = null, sound = 'estudio', job = null, lastOpts = null;
+let demoAudio = new Audio(), demoBtn = null;
+const fmt = (v, d=2) => Number(v).toFixed(d);
+
+const FX = [
+  {k:'volume', l:'Volumen', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
+  {k:'filter', l:'Tono (filtro)', min:500, max:22000, step:100, f:v=>v>=20000?'abierto':(v/1000).toFixed(1)+' kHz', s:'Bájalo para un sonido más cálido y oscuro'},
+  {k:'reverb', l:'Reverb', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
+  {k:'room', l:'Tamaño de la sala', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
+  {k:'attack', l:'Ataque', min:0.001, max:0.5, step:.001, f:v=>Math.round(v*1000)+' ms'},
+  {k:'release', l:'Release (resonancia al soltar)', min:0.05, max:5, step:.05, f:v=>fmt(v)+' s'},
+];
+const QUAL = [
+  {k:'follow_dynamics', l:'Copiar la dinámica del original', min:0, max:1, step:.05, v:.7, f:v=>Math.round(v*100)+' %', s:'Crescendos, acentos y silencios iguales que en el original'},
+  {k:'copy_timbre', l:'Copiar el timbre del original', min:0, max:1, step:.05, v:.35, f:v=>Math.round(v*100)+' %', s:'Toma el balance de graves/agudos del original. Más alto = se parece más al original, menos a guitarra'},
+  {k:'clarity', l:'Nitidez flamenca', min:0, max:1, step:.05, v:.6, f:v=>Math.round(v*100)+' %', s:'Graves limpios, sin barro, más presencia y ataque de la pulsación'},
+  {k:'strum', l:'Rasgueo de acordes', min:0, max:1, step:.05, v:.35, f:v=>v==0?'cuerdas a la vez':Math.round(v*22)+' ms entre cuerdas', s:'Los acordes se rasguean como un guitarrista (abajo/arriba)'},
+  {k:'tremolo', l:'Notas largas sostenidas', type:'select', opts:[['auto','Trémolo flamenco donde el original sostiene (voz, violín…)'],['on','Trémolo en todas las notas largas de la melodía'],['off','Dejar que la cuerda se apague sola']], v:'auto'},
+  {k:'guitar_register', l:'Registro de la guitarra', type:'select', opts:[['1','Ajustar al registro real de una guitarra'],['0','Mantener las octavas exactas del original']], v:'1'},
+  {k:'mastering', l:'Masterización', min:0, max:1, step:.05, v:.5, f:v=>v==0?'sin compresión':Math.round(v*100)+' %', s:'Compresión suave y limitador: sonido de grabación terminada'},
+];
+const DET = [
+  {k:'remove_percussion', l:'Quitar la percusión antes de detectar', type:'select', opts:[['1','Sí (baterías, palmas, cajón…)'],['0','No (sólo instrumentos con notas)']], v:'1'},
+  {k:'clean', l:'Limpiar notas falsas', type:'select', opts:[['1','Sí: quita re-ataques y armónicos fantasma'],['0','No: todo lo que detecte el modelo']], v:'1'},
+  {k:'mode', l:'Qué notas tocar', type:'select', opts:[['poli','Todas: acordes y varias voces'],['melodia','Solo la melodía principal']], v:'poli'},
+  {k:'sensitivity', l:'Sensibilidad', min:0, max:1, step:.05, v:.5, f:v=>Math.round(v*100)+' %', s:'Más alta = detecta notas más suaves (y algo más de ruido)'},
+  {k:'min_note_ms', l:'Duración mínima de nota', min:20, max:300, step:5, v:70, f:v=>v+' ms'},
+  {k:'transpose', l:'Transponer', min:-12, max:12, step:1, v:0, f:v=>(v>0?'+':'')+v+' semitonos'},
+  {k:'follow_tuning', l:'Respetar la afinación del original', type:'select', opts:[['1','Sí (suena igual que el original)'],['0','No (afinación estándar 440 Hz)']], v:'1'},
+  {k:'bits', l:'Calidad WAV', type:'select', opts:[['24','24 bits'],['16','16 bits']], v:'24'},
+];
+
+function ctl(def, val, grid){
+  const d = document.createElement('div'); d.className='ctl';
+  if(def.type==='select'){
+    d.innerHTML = `<label>${def.l}</label><select id="o_${def.k}">${def.opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
+    grid.appendChild(d); $('o_'+def.k).value = val; $('o_'+def.k).onchange = changed;
+  } else {
+    d.innerHTML = `<label>${def.l} <span id="v_${def.k}"></span></label><input type="range" id="o_${def.k}" min="${def.min}" max="${def.max}" step="${def.step}">${def.s?`<small>${def.s}</small>`:''}`;
+    grid.appendChild(d); const r = $('o_'+def.k); r.value = val;
+    const upd = ()=>{ $('v_'+def.k).textContent = def.f(+r.value) }; upd();
+    r.oninput = ()=>{ upd(); changed(); };
+  }
+}
+
+function setFx(){
+  const s = CFG.sounds.find(x=>x.id===sound);
+  $('fxGrid').innerHTML=''; FX.forEach(d=>ctl(d, s.fx[d.k], $('fxGrid')));
+  const mix = sound==='mezcla'; $('mixBox').classList.toggle('show', mix);
+  if(mix){ [0,1].forEach(i=>{ const r=$('lv'+i); r.value=s.layers[i].level; const u=()=>$('lv'+i+'v').textContent=Math.round(r.value*100)+' %'; u(); r.oninput=()=>{u();changed();}; }); }
+}
+
+function options(){
+  const o = {sound};
+  FX.concat(DET, QUAL).forEach(d=>{ const el=$('o_'+d.k); if(el) o[d.k] = d.type==='select' ? el.value : +el.value; });
+  o.follow_tuning = o.follow_tuning==='1'; o.bits = +o.bits;
+  ['guitar_register','remove_percussion','clean'].forEach(k=>{ if(k in o) o[k] = o[k]==='1'; });
+  if(sound==='mezcla') o.levels = [+$('lv0').value, +$('lv1').value];
+  return o;
+}
+function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); }
+
+function renderSounds(){
+  $('sounds').innerHTML = CFG.sounds.map(s=>`
+    <div class="sound ${s.id===sound?'sel':''}" data-id="${s.id}">
+      <h3>${s.name}</h3><div class="sub">${s.subtitle}</div><p>${s.desc}</p>
+      <button class="btn small demo" data-id="${s.id}">▶ Escuchar ejemplo</button>
+    </div>`).join('');
+  document.querySelectorAll('.sound').forEach(el=>el.onclick = e=>{
+    if(e.target.classList.contains('demo')) return;
+    sound = el.dataset.id; document.querySelectorAll('.sound').forEach(x=>x.classList.toggle('sel', x===el)); setFx(); changed();
+  });
+  document.querySelectorAll('.demo').forEach(b=>b.onclick = ()=>playDemo(b));
+}
+function playDemo(b){
+  const same = demoBtn===b && !demoAudio.paused;
+  demoAudio.pause(); if(demoBtn){ demoBtn.classList.remove('playing'); demoBtn.textContent='▶ Escuchar ejemplo'; }
+  if(same){ demoBtn=null; return; }
+  stopAll(); demoBtn=b; b.textContent='⏳ Cargando…';
+  demoAudio = new Audio('/api/demo/'+b.dataset.id);
+  demoAudio.oncanplay = ()=>{ b.textContent='⏸ Parar'; b.classList.add('playing'); };
+  demoAudio.onended = ()=>{ b.textContent='▶ Escuchar ejemplo'; b.classList.remove('playing'); };
+  demoAudio.onerror = ()=>{ b.textContent='▶ Escuchar ejemplo'; alert('No he podido cargar el ejemplo.'); };
+  demoAudio.play().catch(()=>{});
+}
+
+// ---------- archivo
+function pick(f){
+  if(!f) return;
+  if(!/\.wav(e)?$/i.test(f.name)){ alert('El archivo tiene que ser WAV.'); return; }
+  file = f; $('fileBox').classList.add('show'); $('fileName').textContent = f.name;
+  $('fileMeta').textContent = (f.size/1048576).toFixed(1)+' MB';
+  $('origPrev').src = URL.createObjectURL(f);
+  $('origPrev').onloadedmetadata = ()=>{ const d=$('origPrev').duration; $('fileMeta').textContent += ` · ${Math.floor(d/60)}:${String(Math.round(d%60)).padStart(2,'0')} min`; };
+  $('goBtn').disabled = !CFG.plugin_ok; $('goHint').textContent = 'Suele tardar bastante menos de lo que dura el audio.';
+  $('saveName').value = '';
+}
+$('fileIn').onchange = e=>pick(e.target.files[0]);
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop', e=>pick(e.dataTransfer.files[0]));
+
+// ---------- conversión
+function progress(p, msg, err){
+  $('progBox').style.display='block'; $('bar').style.width = p+'%';
+  $('pct').textContent = Math.round(p)+' %'; $('msg').textContent = msg; $('msg').classList.toggle('err', !!err);
+}
+function busy(b){ $('goBtn').disabled = b || !file; $('reBtn').disabled = b; $('newTrackBtn').disabled = b; }
+let nextVersion = 'fresh';
+
+$('goBtn').onclick = ()=>{
+  if(!file) return; busy(true); stopAll();
+  const opts = options(); const fd = new FormData();
+  fd.append('file', file); fd.append('options', JSON.stringify(opts));
+  const x = new XMLHttpRequest(); x.open('POST','/api/convert');
+  x.upload.onprogress = e=>{ if(e.lengthComputable) progress(e.loaded/e.total*2, `Subiendo el archivo… ${Math.round(e.loaded/e.total*100)} %`); };
+  x.onload = ()=>{ const r = JSON.parse(x.responseText||'{}'); if(x.status!==200){ progress(0, r.error||'Error', true); busy(false); return; } lastOpts = opts; nextVersion = 'fresh'; poll(r.id); };
+  x.onerror = ()=>{ progress(0,'No se ha podido conectar con la app. ¿Está abierta?', true); busy(false); };
+  progress(0,'Subiendo el archivo…'); x.send(fd);
+};
+async function rerender(mode){
+  busy(true); stopAll(); const opts = options();
+  const r = await fetch('/api/rerender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:job.id, options:opts})}).then(r=>r.json());
+  if(r.error){ progress(0, r.error, true); busy(false); return; }
+  lastOpts = opts; $('reBox').hidden = true; nextVersion = mode; poll(r.id);
+}
+$('reBtn').onclick = ()=>rerender('replace');
+$('newTrackBtn').onclick = ()=>{ if(job) rerender('add'); };
+async function poll(id){
+  try{
+    const j = await fetch('/api/job/'+id).then(r=>r.json());
+    if(j.status==='error'){ progress(0, j.message, true); busy(false); return; }
+    progress(Math.max(2, j.progress), j.message);
+    if(j.status==='done'){ job = j; showResult(); onVersion(j, nextVersion); busy(false); return; }
+  }catch(e){}
+  setTimeout(()=>poll(id), 400);
+}
+
+// ---------- resultado
+const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const nn = p => NN[p%12]+(Math.floor(p/12)-1);
+function showResult(){
+  $('result').style.display='block';
+  const i = job.info, s = CFG.sounds.find(x=>x.id===job.sound);
+  $('chips').innerHTML = [
+    ['Sonido', s.name], ['Notas', i.n_notes], ['Tempo', Math.round(i.tempo)+' BPM'],
+    ['Rango', nn(i.lowest)+' – '+nn(i.highest)], ['Notas a la vez (máx.)', i.polyphony],
+    ['Afinación', (i.tuning_cents>0?'+':'')+i.tuning_cents+' cents'], ['Duración', fmt(i.duration,1)+' s'],
+    ...(i.similarity!=null ? [['Parecido armónico con el original', i.similarity+' %']] : []),
+  ].map(c=>`<span class="chip">${c[0]}: <b>${c[1]}</b></span>`).join('');
+  const t = Date.now(), base = '/api/job/'+job.id+'/';
+  $('aWav').src = base+'wav?t='+t; $('aMid').src = base+'midi_preview?t='+t; $('aOrig').src = base+'original';
+  $('dlWav').href = base+'wav?download=1'; $('dlMid').href = base+'mid?download=1';
+  $('wavName').textContent = job.basename+'.wav';
+  if(!$('saveName').value || $('saveName').dataset.auto==='1'){ $('saveName').value = job.basename; $('saveName').dataset.auto='1'; }
+  $('saved').innerHTML=''; $('reBox').hidden = true;
+  drawRoll(0); $('result').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('saveName').oninput = ()=>$('saveName').dataset.auto='0';
+
+// sólo suena un reproductor a la vez; la línea del piano roll sigue al que suena
+const players = ['aWav','aMid','aOrig','origPrev','aMix'];
+function stopAll(except){ players.forEach(id=>{ if(id!==except) $(id).pause(); }); if(except!=='mixer') mixPause(); if(except!=='demo'){ demoAudio.pause(); if(demoBtn){demoBtn.classList.remove('playing');demoBtn.textContent='▶ Escuchar ejemplo';} } }
+players.forEach(id=>{ $(id).addEventListener('play', ()=>{ stopAll(id); tick(); }); });
+let raf = null;
+function tick(){
+  cancelAnimationFrame(raf);
+  const a = players.map(id=>$(id)).find(a=>!a.paused) ; if(!a){ return; }
+  drawRoll(a.currentTime); raf = requestAnimationFrame(tick);
+}
+players.forEach(id=>$(id).addEventListener('seeked', ()=>drawRoll($(id).currentTime)));
+
+function drawRoll(time){
+  if(!job) return;
+  const c = $('roll'), dpr = window.devicePixelRatio||1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W*dpr; c.height = H*dpr; const g = c.getContext('2d'); g.scale(dpr,dpr);
+  const notes = job.notes, dur = Math.max(job.info.duration, ...notes.map(n=>n[1]));
+  const lo = Math.min(...notes.map(n=>n[2]))-2, hi = Math.max(...notes.map(n=>n[2]))+2, rows = hi-lo+1;
+  const rh = H/rows;
+  for(let p=lo;p<=hi;p++){ if([1,3,6,8,10].includes(p%12)){ g.fillStyle='#171009'; g.fillRect(0,H-(p-lo+1)*rh,W,rh); }
+    if(p%12===0){ g.fillStyle='#4a3828'; g.fillRect(0,H-(p-lo)*rh,W,1); g.fillStyle='#7d6650'; g.font='10px Inter'; g.fillText(nn(p),3,H-(p-lo)*rh-2);} }
+  for(const n of notes){
+    const x = n[0]/dur*W, w = Math.max(2,(n[1]-n[0])/dur*W), y = H-(n[2]-lo+1)*rh;
+    const on = time>=n[0] && time<=n[1];
+    g.fillStyle = on ? '#ffd9a0' : `rgba(209,157,97,${0.35+0.65*n[3]/127})`;
+    g.fillRect(x,y+0.5,w,Math.max(1.5,rh-1));
+  }
+  if(time>0){ g.fillStyle='#b8322a'; g.fillRect(time/dur*W,0,2,H); }
+}
+window.addEventListener('resize', ()=>drawRoll(0));
+$('roll').onclick = e=>{ // clic en el piano roll = saltar a ese momento
+  const r = $('roll').getBoundingClientRect(), t = (e.clientX-r.left)/r.width*Math.max(job.info.duration, ...job.notes.map(n=>n[1]));
+  if(MX.playing){ mixSeek(t); return; }
+  const a = players.map(id=>$(id)).find(a=>!a.paused) || $('aWav'); a.currentTime = t;
+};
+
+// ---------- mezclador de pistas (Web Audio: se escucha en directo)
+const COLORS = ['#d19d61','#6fa8dc','#b8322a','#8fbf6a','#c27ba0','#e8c35a','#5fb3a6'];
+const MX = {ctx:null, master:null, analyser:null, tracks:[], versions:[], playing:false, startAt:0, offset:0, mixId:null, dirty:true, seq:0};
+const fmtT = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+function soundName(id){ const s = CFG.sounds.find(x=>x.id===id); return s ? s.name : id; }
+function mxCtx(){
+  if(!MX.ctx){
+    MX.ctx = new (window.AudioContext||window.webkitAudioContext)();
+    MX.master = MX.ctx.createGain(); MX.analyser = MX.ctx.createAnalyser(); MX.analyser.fftSize = 1024;
+    MX.master.connect(MX.analyser); MX.analyser.connect(MX.ctx.destination);
+    MX.master.gain.value = +$('mxMaster').value;
+  }
+  return MX.ctx;
+}
+function trackLabel(v, kind){
+  const n = MX.versions.indexOf(v)+1, vv = MX.versions.length>1 ? ` · versión ${n}` : '';
+  if(kind==='original') return ['Original', 'La grabación que subiste'];
+  if(kind==='midi_preview') return ['Notas MIDI', 'Sonido neutro de las notas'+vv];
+  return ['Guitarra · '+soundName(v.sound), 'Guitarra flamenca convertida'+vv];
+}
+async function addTrack(v, kind, gain=1, opts={}){
+  const ctx = mxCtx();
+  const t = {uid:++MX.seq, job:v.id, v, kind, gain, pan:opts.pan||0, mute:false, solo:false, buffer:null,
+             color: COLORS[(MX.seq-1)%COLORS.length]};
+  t.g = ctx.createGain(); t.p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if(t.p){ t.g.connect(t.p); t.p.connect(MX.master); } else t.g.connect(MX.master);
+  if(opts.replaceUid){ const i = MX.tracks.findIndex(x=>x.uid===opts.replaceUid); if(i>=0){ removeTrack(MX.tracks[i], true); MX.tracks.splice(i,1,t); } else MX.tracks.push(t); }
+  else MX.tracks.push(t);
+  MX.dirty = true; renderTracks();
+  try{
+    const buf = await fetch(`/api/job/${v.id}/${kind}?t=${Date.now()}`).then(r=>r.arrayBuffer());
+    t.buffer = await ctx.decodeAudioData(buf);
+  }catch(e){ t.error = true; }
+  renderTracks(); applyMix();
+  if(MX.playing){ startSource(t, ctx.currentTime - MX.startAt); }
+}
+function removeTrack(t, silent){
+  if(t.src){ try{ t.src.stop(); }catch(e){} }
+  t.g.disconnect(); if(t.p) t.p.disconnect();
+  if(!silent){ MX.tracks = MX.tracks.filter(x=>x!==t); MX.dirty = true; renderTracks(); applyMix(); }
+}
+function onVersion(v, mode){
+  if(mode==='fresh' || !MX.versions.length){
+    mixPause(); MX.offset = 0; MX.tracks.slice().forEach(t=>removeTrack(t, true)); MX.tracks = []; MX.versions = [v];
+    addTrack(v, 'wav', 1); addTrack(v, 'original', 0.3);
+  } else {
+    MX.versions.push(v);
+    if(mode==='add') addTrack(v, 'wav', 0.8);
+    else { const main = MX.tracks.find(t=>t.kind==='wav'); addTrack(v, 'wav', main?main.gain:1, {replaceUid: main&&main.uid, pan: main?main.pan:0}); }
+  }
+  $('mxResult').style.display = 'none'; $('fMix').checked = false;
+}
+function audible(t){ const anySolo = MX.tracks.some(x=>x.solo); return !t.mute && (!anySolo || t.solo); }
+function applyMix(){
+  if(!MX.ctx) return;
+  const now = MX.ctx.currentTime;
+  MX.tracks.forEach(t=>{ t.g.gain.setTargetAtTime(audible(t)? t.gain : 0, now, 0.015); if(t.p) t.p.pan.setTargetAtTime(t.pan, now, 0.015); });
+  MX.master.gain.setTargetAtTime(+$('mxMaster').value, now, 0.015);
+  $('mxMasterV').textContent = dbText(+$('mxMaster').value);
+  const ready = MX.tracks.some(t=>t.buffer);
+  $('mxPlay').disabled = !ready; $('mxExport').disabled = !MX.tracks.length;
+  updTime(MX.playing ? now - MX.startAt : MX.offset);
+}
+function dbText(g){ return g<=0.001 ? '−∞ dB' : `${Math.round(g*100)} % (${(20*Math.log10(g)>=0?'+':'')}${(20*Math.log10(g)).toFixed(1)} dB)`; }
+function mixDur(){ return Math.max(0, ...MX.tracks.filter(t=>t.buffer).map(t=>t.buffer.duration)); }
+function renderTracks(){
+  const box = $('tracks');
+  box.innerHTML = MX.tracks.map(t=>{ const [nm, sub] = trackLabel(t.v, t.kind); return `
+    <div class="track ${audible(t)?'':'off'} ${t.buffer||t.error?'':'loading'}" data-uid="${t.uid}">
+      <span class="dot" style="background:${t.color}"></span>
+      <div class="nm">${nm}<small>${t.error?'⚠ no se ha podido cargar':sub}</small></div>
+      <div class="ms"><button class="m ${t.mute?'on':''}" title="Silenciar">M</button><button class="s ${t.solo?'on':''}" title="Solo">S</button></div>
+      <div class="vol"><label>Volumen <span>${dbText(t.gain)}</span></label><input type="range" min="0" max="1.5" step="0.01" value="${t.gain}"></div>
+      <div class="pan"><label>Panorama <span>${t.pan==0?'centro':(t.pan<0?'izq. ':'der. ')+Math.round(Math.abs(t.pan)*100)}</span></label><input type="range" min="-1" max="1" step="0.05" value="${t.pan}"></div>
+      <button class="x" title="Quitar pista">✕</button>
+    </div>`; }).join('');
+  box.querySelectorAll('.track').forEach(el=>{
+    const t = MX.tracks.find(x=>x.uid==el.dataset.uid);
+    const [vol, pan] = el.querySelectorAll('input');
+    vol.oninput = ()=>{ t.gain = +vol.value; el.querySelector('.vol span').textContent = dbText(t.gain); MX.dirty = true; applyMix(); };
+    pan.oninput = ()=>{ t.pan = +pan.value; el.querySelector('.pan span').textContent = t.pan==0?'centro':(t.pan<0?'izq. ':'der. ')+Math.round(Math.abs(t.pan)*100); MX.dirty = true; applyMix(); };
+    el.querySelector('.m').onclick = ()=>{ t.mute = !t.mute; MX.dirty = true; renderTracks(); applyMix(); };
+    el.querySelector('.s').onclick = ()=>{ t.solo = !t.solo; MX.dirty = true; renderTracks(); applyMix(); };
+    el.querySelector('.x').onclick = ()=>removeTrack(t);
+  });
+  // lista de pistas que se pueden añadir
+  const opts = [];
+  MX.versions.forEach(v=>['wav','midi_preview'].forEach(k=>{ const [nm, sub] = trackLabel(v,k); opts.push([v.id+'|'+k, nm+(sub.includes('versión')?' ('+sub.split('· ')[1]+')':'')]); }));
+  if(MX.versions.length) opts.push([MX.versions[0].id+'|original', 'Original']);
+  $('addSel').innerHTML = opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
+  $('addBtn').disabled = !opts.length;
+  applyMix();
+}
+$('addBtn').onclick = ()=>{ const [id, kind] = $('addSel').value.split('|'); const v = MX.versions.find(x=>x.id===id); if(v) addTrack(v, kind, kind==='original'?0.3:0.8); };
+$('mxMaster').oninput = ()=>{ MX.dirty = true; applyMix(); };
+$('mxNorm').onchange = ()=>{ MX.dirty = true; };
+
+function startSource(t, offset){
+  if(!t.buffer || offset >= t.buffer.duration) return;
+  const s = MX.ctx.createBufferSource(); s.buffer = t.buffer; s.connect(t.g);
+  s.start(0, Math.max(0, offset)); t.src = s;
+}
+function mixPlay(){
+  const ctx = mxCtx(); ctx.resume(); stopAll('mixer');
+  if(MX.offset >= mixDur()) MX.offset = 0;
+  MX.startAt = ctx.currentTime - MX.offset; MX.playing = true;
+  MX.tracks.forEach(t=>startSource(t, MX.offset));
+  $('mxPlay').textContent = '⏸ Pausa'; mixTick();
+}
+function mixPause(){
+  if(!MX.playing) return;
+  MX.offset = MX.ctx.currentTime - MX.startAt; MX.playing = false;
+  MX.tracks.forEach(t=>{ if(t.src){ try{ t.src.stop(); }catch(e){} t.src = null; } });
+  $('mxPlay').textContent = '▶ Escuchar mezcla'; $('mxMeter').style.width = '0';
+}
+function mixSeek(t){ const was = MX.playing; mixPause(); MX.offset = Math.max(0, Math.min(t, mixDur())); updTime(MX.offset); drawRoll(MX.offset); if(was) mixPlay(); }
+function updTime(t){ const d = mixDur(); $('mxTime').textContent = `${fmtT(t)} / ${fmtT(d)}`; if(!MX.seeking) $('mxSeek').value = d ? t/d : 0; }
+const meterBuf = new Float32Array(1024);
+function mixTick(){
+  if(!MX.playing) return;
+  const t = MX.ctx.currentTime - MX.startAt;
+  if(t >= mixDur()){ mixPause(); MX.offset = 0; updTime(0); drawRoll(0); return; }
+  updTime(t); drawRoll(t);
+  MX.analyser.getFloatTimeDomainData(meterBuf); let pk = 0; for(const x of meterBuf) pk = Math.max(pk, Math.abs(x));
+  $('mxMeter').style.width = Math.min(100, pk*100)+'%'; $('mxMeter').parentElement.title = pk>=1 ? '¡Satura! Baja el volumen o deja activada la normalización' : 'Nivel de salida';
+  requestAnimationFrame(mixTick);
+}
+$('mxPlay').onclick = ()=> MX.playing ? mixPause() : mixPlay();
+$('mxStop').onclick = ()=>mixSeek(0);
+$('mxSeek').oninput = ()=>{ MX.seeking = true; updTime(+$('mxSeek').value*mixDur()); MX.seeking = false; };
+$('mxSeek').onchange = ()=>mixSeek(+$('mxSeek').value*mixDur());
+
+async function exportMix(){
+  if(!MX.dirty && MX.mixId) return MX.mixId;
+  $('mxExport').disabled = true; $('mxMsg').textContent = 'Mezclando pistas…'; $('mxMsg').classList.remove('err');
+  try{
+    const body = {tracks: MX.tracks.map(t=>({job:t.job, kind:t.kind, gain:t.gain, pan:t.pan, mute:t.mute, solo:t.solo, label:trackLabel(t.v,t.kind)[0]})),
+                  master:+$('mxMaster').value, normalize:$('mxNorm').checked, bits:+($('o_bits')?$('o_bits').value:24)};
+    const r = await fetch('/api/mix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+    if(r.error){ $('mxMsg').textContent = r.error; $('mxMsg').classList.add('err'); return null; }
+    MX.mixId = r.id; MX.dirty = false;
+    const base = '/api/job/'+r.id+'/mix';
+    $('aMix').src = base+'?t='+Date.now(); $('dlMix').href = base+'?download=1';
+    $('mxName').textContent = `${fmtT(r.duration)} · ${MX.tracks.filter(audible).length} pistas`;
+    $('mxResult').style.display = 'grid'; $('fMix').checked = true;
+    $('mxMsg').textContent = '✓ Mezcla lista. Escúchala, descárgala o guárdala abajo.';
+    return r.id;
+  } finally { $('mxExport').disabled = false; }
+}
+$('mxExport').onclick = exportMix;
+
+// ---------- guardar
+$('chooseBtn').onclick = async ()=>{
+  $('chooseBtn').disabled = true; $('chooseBtn').textContent = '📁 Elige la carpeta en la ventana que se ha abierto…';
+  try{ const r = await fetch('/api/choose-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()); if(r.folder) $('folder').value = r.folder; }
+  finally{ $('chooseBtn').disabled=false; $('chooseBtn').textContent='📁 Elegir carpeta…'; }
+};
+$('saveBtn').onclick = async ()=>{
+  const formats = [$('fWav').checked&&'wav', $('fMid').checked&&'mid', $('fMix').checked&&'mix'].filter(Boolean);
+  if(!formats.length){ alert('Marca al menos un archivo para guardar.'); return; }
+  let mix_id = null;
+  if(formats.includes('mix')){ mix_id = await exportMix(); if(!mix_id){ $('saved').innerHTML = '<span class="err">No se ha podido crear la mezcla.</span>'; return; } }
+  const r = await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:job.id, folder:$('folder').value, formats, mix_id, name:$('saveName').value})}).then(r=>r.json());
+  if(r.error){ $('saved').innerHTML = `<span class="err">${r.error}</span>`; return; }
+  $('saved').innerHTML = r.saved.map(p=>`<div>✓ Guardado: ${p.replace(/</g,'&lt;')}</div>`).join('') +
+    `<button class="btn small" style="margin-top:8px" id="showF">Mostrar la carpeta</button>`;
+  $('showF').onclick = ()=>fetch('/api/open-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:r.saved[0]})});
+};
+
+// ---------- plugin
+$('pluginPick').onclick = async ()=>{
+  const r = await fetch('/api/choose-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({purpose:'plugin'})}).then(r=>r.json());
+  if(r.folder){ $('pluginDir').value = r.folder; $('pluginSet').click(); }
+};
+$('pluginSet').onclick = async ()=>{
+  const r = await fetch('/api/plugin-dir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:$('pluginDir').value})}).then(r=>r.json());
+  if(r.error){ alert(r.error); return; } init(r);
+};
+
+function init(cfg){
+  CFG = cfg; $('pluginWarn').style.display = cfg.plugin_ok ? 'none' : 'block';
+  $('pluginErr').textContent = cfg.plugin_error||''; $('pluginDir').value = cfg.plugin_dir;
+  $('folder').value = $('folder').value || cfg.last_folder;
+  renderSounds(); setFx();
+  if(!$('detGrid').children.length) DET.forEach(d=>ctl(d, d.v, $('detGrid')));
+  if(!$('qualGrid').children.length) QUAL.forEach(d=>ctl(d, d.v, $('qualGrid')));
+  $('goBtn').disabled = !file || !cfg.plugin_ok;
+}
+fetch('/api/config').then(r=>r.json()).then(init);
+</script>
+</body>
+</html>

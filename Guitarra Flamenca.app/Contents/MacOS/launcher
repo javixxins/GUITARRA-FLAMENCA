@@ -1,0 +1,30 @@
+#!/bin/bash
+# Lanzador del icono Guitarra Flamenca (macOS).
+#
+# macOS no deja a un icono leer carpetas como Documentos o Descargas, así que no
+# arranca nada por sí mismo: si el servidor ya está en marcha abre el navegador,
+# y si no, pide a Terminal que ejecute "Iniciar Guitarra Flamenca.command",
+# que está en la misma carpeta que este icono.
+APP_DIR="$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")"
+
+for P in $(seq 8850 8859); do
+  if /usr/bin/curl -s -m 1 "http://127.0.0.1:$P/api/config" | /usr/bin/grep -q '"app": *"guitarra-flamenca"'; then
+    /usr/bin/open "http://127.0.0.1:$P"
+    exit 0
+  fi
+done
+
+case "$APP_DIR" in
+  */AppTranslocation/*)
+    /usr/bin/osascript -e 'display dialog "macOS ha abierto el icono en modo aislado (archivo descargado de Internet).\n\nLa primera vez abre «instalar.command» (clic derecho → Abrir). Después el icono funcionará normalmente." buttons {"Entendido"} with title "Guitarra Flamenca" with icon caution'
+    exit 0;;
+esac
+
+/usr/bin/osascript - "$APP_DIR/Iniciar Guitarra Flamenca.command" <<'OSA'
+on run argv
+    tell application "Terminal"
+        activate
+        do script quoted form of (item 1 of argv)
+    end tell
+end run
+OSA
