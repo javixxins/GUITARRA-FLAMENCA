@@ -1,0 +1,52 @@
+name: Prueba en Windows y Mac
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  prueba:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      GF_NO_START: "1"
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Instalador de Windows (instalar.bat)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call instalar.bat
+
+      - name: Instalador de Mac (instalar.command)
+        if: runner.os == 'macOS'
+        run: ./instalar.command
+
+      - name: Prueba de punta a punta (convertir, MIDI, mezclar, guardar)
+        shell: bash
+        run: |
+          if [ -x .venv/Scripts/python.exe ]; then PY=.venv/Scripts/python.exe; else PY=.venv/bin/python; fi
+          $PY -W ignore pruebas/prueba_rapida.py
+
+      - name: El servidor arranca y responde
+        shell: bash
+        run: |
+          if [ -x .venv/Scripts/python.exe ]; then PY=.venv/Scripts/python.exe; else PY=.venv/bin/python; fi
+          $PY -W ignore server.py --no-browser > server.log 2>&1 &
+          for i in $(seq 1 120); do
+            if [ -f .port ] && curl -s -m 2 "http://127.0.0.1:$(cat .port)/api/config" | grep -q guitarra-flamenca; then
+              echo "OK en el puerto $(cat .port)"; curl -s -X POST "http://127.0.0.1:$(cat .port)/api/quit"; exit 0
+            fi
+            sleep 1
+          done
+          cat server.log; exit 1
