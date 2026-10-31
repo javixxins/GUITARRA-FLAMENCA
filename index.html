@@ -106,6 +106,15 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 @media (max-width:760px){.track{grid-template-columns:14px 1fr auto auto}.track .vol,.track .pan{grid-column:2 / -1}.masterrow{grid-template-columns:1fr}}
 @media (max-width:640px){.player{grid-template-columns:1fr}.save{grid-template-columns:1fr}.mix.show{grid-template-columns:1fr}.hero{min-height:150px}}
 
+/* ---- mis ajustes */
+.mypre{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:16px}
+.mypre b{font-size:14px;margin-right:2px}
+.mypre select{flex:1 1 200px;width:auto;min-width:180px}
+.mypre input{flex:1 1 180px;min-width:150px}
+.mypre .sep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+.mypre .msg{flex-basis:100%;font-size:13px;color:var(--muted);min-height:1em}
+.mypre .msg.ok{color:var(--ok)} .mypre .msg.warn{color:var(--gold2)}
+@media (max-width:640px){.mypre .sep{display:none}}
 /* ---- reverb y ecualizador */
 .fxcols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:12px}
 .fxcols h3{font-family:Fraunces,Georgia,serif;font-size:16px;margin:0 0 8px;color:var(--text)}
@@ -178,6 +187,15 @@ body.haslive main{padding-bottom:150px}
 
   <section class="card">
     <div class="step"><b>2</b><h2>Elige el sonido de guitarra</h2></div>
+    <div class="mypre" id="myPre">
+      <b>💾 Mis ajustes</b>
+      <select id="preSel" title="Ajustes que has guardado"><option value="">— Elige unos ajustes guardados —</option></select>
+      <button class="btn small" id="preDel" title="Borrar los ajustes elegidos" disabled>🗑 Borrar</button>
+      <span class="sep"></span>
+      <input type="text" id="preName" maxlength="60" placeholder="Nombre, p. ej. «Voz con tablao»">
+      <button class="btn small primary" id="preSave">Guardar ajustes actuales</button>
+      <div class="msg" id="preMsg">Guarda el sonido, la reverb, el ecualizador y todos los controles con un nombre para usarlos otra vez.</div>
+    </div>
     <div class="recbox" id="recBox">
       <div class="rechead">
         <button class="btn primary" id="recBtn" disabled>✨ Ajuste recomendado</button>
@@ -408,7 +426,7 @@ function options(){
   if(sound==='mezcla') o.levels = [+$('lv0').value, +$('lv1').value];
   return o;
 }
-function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); lvSchedule(); markPresets(); drawEq(); }
+function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); lvSchedule(); markPresets(); drawEq(); preCheck(); }
 
 function renderSounds(){
   $('sounds').innerHTML = CFG.sounds.map(s=>`
@@ -888,6 +906,51 @@ function drawEq(){
   g.stroke();
 }
 window.addEventListener('resize', drawEq);
+
+// ---------- mis ajustes guardados
+let PRESETS = [];
+function preMsg(t, cls){ $('preMsg').textContent = t; $('preMsg').className = 'msg' + (cls?' '+cls:''); }
+function fillPresets(list, select){
+  PRESETS = list || [];
+  $('preSel').innerHTML = '<option value="">— Elige unos ajustes guardados —</option>' +
+    PRESETS.map(p=>`<option value="${p.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${p.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
+  $('preSel').value = select && PRESETS.some(p=>p.name===select) ? select : '';
+  $('preDel').disabled = !$('preSel').value;
+}
+function presetDiffers(){
+  const p = PRESETS.find(x=>x.name===$('preSel').value); if(!p) return false;
+  const cur = options();
+  return Object.entries(p.options).some(([k,v])=>JSON.stringify(cur[k])!==JSON.stringify(v));
+}
+function preCheck(){
+  if(!$('preSel') || !$('preSel').value) return;
+  if(presetDiffers()) preMsg(`Has cambiado algo desde «${$('preSel').value}». Pulsa «Guardar ajustes actuales» para actualizarlos, o guárdalos con otro nombre.`, 'warn');
+  else preMsg(`Usando «${$('preSel').value}».`, 'ok');
+}
+$('preSel').onchange = ()=>{
+  const p = PRESETS.find(x=>x.name===$('preSel').value);
+  $('preDel').disabled = !p;
+  if(!p){ preMsg('Elige unos ajustes de la lista o guarda los actuales.'); return; }
+  applyOptions(p.options); $('preName').value = p.name;
+  preMsg(`✓ Ajustes «${p.name}» cargados. Se oyen ya en la preescucha.`, 'ok');
+};
+$('preSave').onclick = async ()=>{
+  const name = $('preName').value.trim().replace(/\s+/g,' ');
+  if(!name){ preMsg('Escribe un nombre para estos ajustes.', 'warn'); $('preName').focus(); return; }
+  if(PRESETS.some(p=>p.name===name) && !confirm(`Ya tienes unos ajustes llamados «${name}». ¿Quieres sustituirlos por los actuales?`)) return;
+  const r = await fetch('/api/presets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name, options:options()})}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ preMsg(r.error, 'warn'); return; }
+  fillPresets(r.presets, name); preMsg(`✓ Guardado como «${name}».`, 'ok');
+};
+$('preName').onkeydown = e=>{ if(e.key==='Enter') $('preSave').click(); };
+$('preDel').onclick = async ()=>{
+  const name = $('preSel').value; if(!name) return;
+  if(!confirm(`¿Borrar los ajustes «${name}»?`)) return;
+  const r = await fetch('/api/presets/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ preMsg(r.error, 'warn'); return; }
+  fillPresets(r.presets); preMsg(`Ajustes «${name}» borrados.`);
+};
+fetch('/api/presets').then(r=>r.json()).then(r=>fillPresets(r.presets)).catch(()=>{});
 
 function init(cfg){
   CFG = cfg; $('pluginWarn').style.display = cfg.plugin_ok ? 'none' : 'block';

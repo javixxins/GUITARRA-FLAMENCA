@@ -15,6 +15,7 @@ sin subir nada a Internet.
 - **Reverb y ecualizador de la guitarra**, con estilos listos para usar:
   - Reverb: Seca, Estudio, Tablao, Patio andaluz, Sala de conciertos, Iglesia.
   - Ecualizador de 5 bandas: Plano, Flamenco nítido, Cálida, Con cuerpo, Brillante.
+- **Mis ajustes**: guarda toda la configuración con un nombre y vuelve a elegirla cuando quieras.
 - **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
   plugin y aplica el que más se le parece, explicando por qué. Luego puedes retocarlo.
 - Escucha el resultado al momento, mézclalo con el original y guárdalo en la carpeta que elijas.
@@ -64,7 +65,8 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
 
 1. Sube tu WAV. Abajo aparece la **preescucha en directo**: pulsa ▶ y suena en bucle un fragmento
    ya convertido. Usa *Guitarra / Original* para comparar y la barra para elegir otro fragmento.
-2. Pulsa **✨ Ajuste recomendado**, o elige el sonido y ajusta los controles a mano.
+2. Pulsa **✨ Ajuste recomendado**, elige unos ajustes de **💾 Mis ajustes**, o elige el sonido y
+   ajusta los controles a mano. Cuando te guste, escribe un nombre y pulsa *Guardar ajustes actuales*.
    Cada cambio se oye al momento en la preescucha.
 3. Convierte y mira la barra de progreso.
 4. Escucha la guitarra, el MIDI y el original.
@@ -171,6 +173,7 @@ La conversión final reutiliza ese análisis y tarda la mitad.
 | `index.html` | la interfaz |
 | `instalar.*`, `Iniciar…`, `Parar…` | instalar, abrir y cerrar (`.bat` en Windows, `.command` en Mac) |
 | `make_icon.py` | dibuja el icono |
+| `mis_ajustes.json` | tus ajustes guardados (se crea al guardar el primero; no se sube a GitHub) |
 
 ## Créditos
 - Muestras de guitarra: *Flamenco Dreams Guitar* © Martin Andrew Smith (se descarga aparte).

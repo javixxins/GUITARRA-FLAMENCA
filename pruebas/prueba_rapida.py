@@ -95,6 +95,7 @@ def main():
     server.CONFIG = os.path.join(TMP, "config.json")  # no toca la configuración del usuario
     server.JOBS_DIR = os.path.join(TMP, "trabajos")
     server.CACHE_DIR = os.path.join(TMP, "cache")
+    server.PRESETS = os.path.join(TMP, "mis_ajustes.json")
     c = server.app.test_client()
 
     print("1. Configuración")
@@ -103,6 +104,15 @@ def main():
     check(len(cfg["sounds"]) >= 4, f"{len(cfg['sounds'])} sonidos disponibles")
     check(c.get("/").status_code == 200, "la página carga")
     check(c.get("/api/demo/estudio").status_code == 200, "demo de sonido")
+
+    print("1b. Mis ajustes guardados")
+    mine = {"sound": "escenario", "reverb": 0.42, "eq_low": 2, "strum": 0.6}
+    r = c.post("/api/presets", json={"name": "  Voz con  tablao ", "options": mine}).get_json()
+    check([p["name"] for p in r["presets"]] == ["Voz con tablao"], "guardados con su nombre")
+    got = c.get("/api/presets").get_json()["presets"][0]["options"]
+    check(got == mine, "se recuperan exactamente iguales")
+    r = c.post("/api/presets/delete", json={"name": "Voz con tablao"}).get_json()
+    check(r["presets"] == [], "se pueden borrar")
 
     print("2. Preescucha en directo")
     r = c.post("/api/preview/start", data={"file": (test_wav(), "prueba acordes.wav"), "options": "{}"},

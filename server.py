@@ -32,6 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(HERE, "trabajos")
 CACHE_DIR = os.path.join(HERE, "cache")
 CONFIG = os.path.join(HERE, "config.json")
+PRESETS = os.path.join(HERE, "mis_ajustes.json")
 PORTS = range(8850, 8860)
 PRESET = "Flamenco Dreams Guitar V2.dspreset"
 SYSTEM = platform.system()  # "Windows", "Darwin" (macOS) o "Linux"
@@ -152,6 +153,58 @@ def api_plugin_dir():
     save_config(plugin_dir=path)
     get_instrument()
     return api_config()
+
+
+# ------------------------------------------------------------------ mis ajustes guardados
+
+def load_presets():
+    try:
+        with open(PRESETS, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_presets(data):
+    tmp = PRESETS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, PRESETS)  # sin dejar el archivo a medias
+
+
+@app.route("/api/presets")
+def api_presets():
+    data = load_presets()
+    items = sorted(data.items(), key=lambda kv: kv[0].lower())
+    return jsonify({"presets": [{"name": k, "options": v.get("options", {}), "saved": v.get("saved")}
+                                for k, v in items]})
+
+
+@app.route("/api/presets", methods=["POST"])
+def api_presets_save():
+    body = request.json or {}
+    name = re.sub(r"\s+", " ", str(body.get("name", ""))).strip()[:60]
+    opts = body.get("options")
+    if not name:
+        return jsonify({"error": "Escribe un nombre para estos ajustes."}), 400
+    if not isinstance(opts, dict) or not opts:
+        return jsonify({"error": "No hay ajustes que guardar."}), 400
+    data = load_presets()
+    data[name] = {"options": opts, "saved": time.strftime("%Y-%m-%d %H:%M")}
+    save_presets(data)
+    return api_presets()
+
+
+@app.route("/api/presets/delete", methods=["POST"])
+def api_presets_delete():
+    name = (request.json or {}).get("name", "")
+    data = load_presets()
+    if name not in data:
+        return jsonify({"error": "Esos ajustes ya no existen."}), 404
+    del data[name]
+    save_presets(data)
+    return api_presets()
 
 
 @app.route("/api/demo/<sound_id>")
