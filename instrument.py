@@ -143,6 +143,58 @@ _CACHE_MAX = 260
 _cache_lock = threading.Lock()  # la preescucha y la conversión pueden cargar a la vez
 
 
+_TUNING_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "afinacion_muestras.json")
+_tuning = None
+_tuning_lock = threading.Lock()
+
+
+def _tuning_db():
+    global _tuning
+    if _tuning is None:
+        try:
+            import json
+            with open(_TUNING_FILE, encoding="utf-8") as f:
+                _tuning = json.load(f)
+        except Exception:
+            _tuning = {}
+    return _tuning
+
+
+def sample_cents(path, root):
+    """Cuántos cents se desvía la muestra de su nota (medido una vez con YIN y guardado).
+    Las guitarras reales no están perfectas: así cada nota suena exactamente afinada."""
+    db = _tuning_db()
+    try:
+        key = f"{os.path.basename(path)}|{os.path.getsize(path)}|{int(round(root))}"
+    except OSError:
+        return 0.0
+    if key in db:
+        return db[key]
+    import librosa
+    cents = 0.0
+    try:
+        data = load_sample(path)
+        y = data[int(0.15 * SR):int(1.2 * SR)].mean(axis=1)
+        ref = 440.0 * 2 ** ((root - 69) / 12)
+        f0 = librosa.yin(y, fmin=ref * 2 ** (-6 / 12), fmax=ref * 2 ** (6 / 12), sr=SR, frame_length=4096)
+        c = 1200 * np.log2(f0 / ref)
+        c = c[np.abs(c) < 60]  # sólo lecturas fiables, cerca de la nota
+        if len(c) >= 5:
+            cents = float(np.clip(np.median(c), -50, 50))
+    except Exception:
+        cents = 0.0
+    with _tuning_lock:
+        db[key] = round(cents, 1)
+        try:
+            import json
+            os.makedirs(os.path.dirname(_TUNING_FILE), exist_ok=True)
+            with open(_TUNING_FILE, "w", encoding="utf-8") as f:
+                json.dump(db, f)
+        except Exception:
+            pass
+    return db[key]
+
+
 def load_sample(path, max_seconds=8.0):
     """Carga un WAV como float32 estéreo a 44.1 kHz (con caché)."""
     key = (path, max_seconds)

@@ -27,7 +27,7 @@ from basic_pitch import note_creation as infer  # noqa: E402
 from basic_pitch.constants import AUDIO_N_SAMPLES, AUDIO_SAMPLE_RATE, FFT_HOP  # noqa: E402
 from basic_pitch.inference import Model, unwrap_output, window_audio_file  # noqa: E402
 
-from instrument import SOUNDS, SR, load_sample  # noqa: E402
+from instrument import SOUNDS, SR, load_sample, sample_cents  # noqa: E402
 
 _model = None
 _model_lock = threading.Lock()
@@ -140,12 +140,15 @@ def notes_from(prep, opts, progress=lambda *a: None):
         min_freq=float(min_freq) if min_freq else None, max_freq=None,
         multiple_pitch_bends=False, melodia_trick=True, midi_tempo=tempo)
 
+    # Desviación de afinación de cada nota (bend). basic-pitch la da en pasos de 1/3 de
+    # semitono con un desplazamiento fijo de un paso (+33 cents en todas las notas), así que
+    # se mide respecto a la mediana de toda la pieza; la afinación global ya la da `tuning`.
+    raw = [float(np.median(b)) if b else None for *_, b in events]
+    known = [r for r in raw if r is not None]
+    offset = float(np.median(known)) if known else 0.0
     notes = []
-    for start, end, pitch, amp, bends in events:
-        bend = 0.0
-        if bends:
-            bend = float(np.median(bends)) / 3.0  # 3 bins por semitono
-            bend = float(np.clip(bend, -0.5, 0.5))
+    for (start, end, pitch, amp, _), r in zip(events, raw):
+        bend = 0.0 if r is None else float(np.clip((r - offset) / 3.0, -0.5, 0.5))
         notes.append({"start": float(start), "end": float(max(end, start + 0.03)),
                       "pitch": int(pitch), "amp": float(amp), "bend": bend})
     notes.sort(key=lambda n: (n["start"], n["pitch"]))
@@ -346,7 +349,7 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
     if not layers:
         raise ValueError("Todas las capas de sonido están a cero.")
     tuning = float(opts.get("tuning_cents", 0)) / 100.0 if opts.get("follow_tuning", True) else 0.0
-    follow_bends = bool(opts.get("follow_bends", True))
+    follow_bends = bool(opts.get("follow_bends", False))  # guitarra: cada nota en su traste exacto
     transpose = int(opts.get("transpose", 0))
     notes = guitarize(notes, opts, transpose)  # registro real y rasgueo de acordes
     transpose = 0
@@ -386,7 +389,8 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
                 t -= 12
             root, path = layer.pick(t)
             data = load_sample(path, layer.max_seconds)
-            ratio = 2 ** ((t - root) / 12.0)
+            # afinación fina: corrige lo que la muestra real se desvía de su nota
+            ratio = 2 ** ((t - root - sample_cents(path, root) / 100.0) / 12.0)
             seg = _shift(data, ratio, n_out)
             m = len(seg)
             if m == 0:

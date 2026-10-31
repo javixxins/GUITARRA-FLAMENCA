@@ -93,6 +93,10 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
 2. **Toque de guitarrista**: registro real de la guitarra, rasgueo de acordes (abajo/arriba)
    y trémolo flamenco en las notas largas.
 3. **Síntesis** con los WAV del plugin (mapa `.dspreset`, round robin, velocidad).
+   - **Afinación exacta**: cada nota suena en su traste, como en una guitarra real.
+   - La app mide una vez la afinación real de cada muestra del plugin y corrige su pequeña desviación.
+   - Si el original no está a 440 Hz, la guitarra sigue su afinación general.
+   - Error medido: 0,3 cents.
 4. **Análisis de la onda del original**: se copia su dinámica y parte de su timbre.
 5. **Nitidez flamenca**:
    - EQ de fase lineal y realce del ataque.
@@ -155,7 +159,7 @@ La conversión final reutiliza ese análisis y tarda la mitad.
   Resultado medio:
   - notas correctas (F1): **0,93**
   - precisión: **0,91**
-  - parecido armónico: **0,88**
+  - parecido armónico: **0,92**
 
 ### Archivos
 | Archivo | Qué es |
