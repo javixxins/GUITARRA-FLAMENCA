@@ -105,6 +105,36 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 .meter div{height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--gold) 70%,var(--red))}
 @media (max-width:760px){.track{grid-template-columns:14px 1fr auto auto}.track .vol,.track .pan{grid-column:2 / -1}.masterrow{grid-template-columns:1fr}}
 @media (max-width:640px){.player{grid-template-columns:1fr}.save{grid-template-columns:1fr}.mix.show{grid-template-columns:1fr}.hero{min-height:150px}}
+
+/* ---- ajuste recomendado */
+.recbox{border:1px solid var(--gold);background:linear-gradient(135deg,rgba(209,157,97,.12),rgba(184,50,42,.08));border-radius:12px;padding:14px;margin-bottom:16px}
+.rechead{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.rechead .muted{flex:1;min-width:220px;font-size:13px}
+.recbox .bar{height:8px;margin-top:10px}
+.recout{margin-top:12px;font-size:14px}
+.recout ul{margin:8px 0 10px;padding-left:20px;color:var(--muted)}
+.recout li{margin:3px 0}
+.recscore{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.recscore span{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px}
+/* ---- preescucha en directo (barra fija abajo) */
+body.haslive main{padding-bottom:150px}
+.live{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(28,21,17,.97);border-top:1px solid var(--gold);
+  box-shadow:0 -8px 30px rgba(0,0,0,.5);backdrop-filter:blur(6px)}
+.live .in{max-width:980px;margin:0 auto;padding:10px 16px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:center}
+.lplay{grid-row:span 2;width:54px;height:54px;border-radius:50%;border:0;background:var(--gold);color:#1a120c;font-size:22px;cursor:pointer}
+.lplay:disabled{opacity:.4;cursor:default}
+.lrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:0}
+.lrow b{font-family:Fraunces,Georgia,serif;font-size:16px}
+.ab{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.ab button{background:none;border:0;color:var(--muted);padding:4px 12px;cursor:pointer;font:inherit;font-size:13px}
+.ab button.on{background:var(--gold);color:#1a120c;font-weight:600}
+.lpos{flex:1;min-width:140px;display:flex;align-items:center;gap:8px}
+.lpos input{flex:1}
+.lstat{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lstat.ok{color:var(--ok)} .lstat.err{color:#ff8a7a}
+.lbar{grid-column:1 / -1;height:4px;background:#0d0907;border-radius:999px;overflow:hidden}
+.lbar div{height:100%;width:0;background:var(--gold)}
+@media (max-width:640px){.live .in{grid-template-columns:auto 1fr}.lplay{width:46px;height:46px}.lrow .chk{font-size:12px}}
 </style>
 </head>
 <body>
@@ -138,6 +168,19 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 
   <section class="card">
     <div class="step"><b>2</b><h2>Elige el sonido de guitarra</h2></div>
+    <div class="recbox" id="recBox">
+      <div class="rechead">
+        <button class="btn primary" id="recBtn" disabled>✨ Ajuste recomendado</button>
+        <span class="muted" id="recHint">Sube un archivo: la app analizará su onda, probará los sonidos y ajustes del plugin y elegirá la guitarra flamenca que más se parece a tu original. Después puedes retocar lo que quieras.</span>
+      </div>
+      <div class="bar" id="recBarBox" hidden><div id="recBar"></div></div>
+      <div class="recout" id="recOut" hidden>
+        <b>✓ Ajuste recomendado aplicado.</b> Escúchalo abajo en la preescucha y retoca cualquier control si quieres.
+        <div class="recscore" id="recScore"></div>
+        <ul id="recWhy"></ul>
+        <button class="btn small" id="recUndo">↶ Volver a los ajustes anteriores</button>
+      </div>
+    </div>
     <div class="sounds" id="sounds"></div>
     <div class="mix" id="mixBox">
       <div class="ctl"><label>Guitarra de Estudio <span id="lv0v"></span></label><input type="range" id="lv0" min="0" max="1" step="0.05"></div>
@@ -233,6 +276,22 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
     <div class="saved" id="saved"></div>
   </section>
 </main>
+<div class="live" id="live" hidden>
+  <div class="in">
+    <button class="lplay" id="lvPlay" disabled title="Escuchar en bucle">▶</button>
+    <div class="lrow">
+      <b>🎧 Preescucha en directo</b>
+      <span class="ab"><button id="abG" class="on">Guitarra</button><button id="abO">Original</button></span>
+      <label class="chk"><input type="checkbox" id="lvAuto" checked> Actualizar al mover controles</label>
+    </div>
+    <div class="lrow">
+      <div class="lpos"><span class="muted" id="lvRange" style="font-size:13px">0:00–0:10</span>
+        <input type="range" id="lvPos" min="0" max="1" step="0.001" value="0" title="Elige qué fragmento escuchar"></div>
+      <span class="lstat" id="lvStat">Preparando…</span>
+    </div>
+    <div class="lbar"><div id="lvBar"></div></div>
+  </div>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -296,7 +355,7 @@ function options(){
   if(sound==='mezcla') o.levels = [+$('lv0').value, +$('lv1').value];
   return o;
 }
-function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); }
+function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); lvSchedule(); }
 
 function renderSounds(){
   $('sounds').innerHTML = CFG.sounds.map(s=>`
@@ -332,6 +391,7 @@ function pick(f){
   $('origPrev').onloadedmetadata = ()=>{ const d=$('origPrev').duration; $('fileMeta').textContent += ` · ${Math.floor(d/60)}:${String(Math.round(d%60)).padStart(2,'0')} min`; };
   $('goBtn').disabled = !CFG.plugin_ok; $('goHint').textContent = 'Suele tardar bastante menos de lo que dura el audio.';
   $('saveName').value = '';
+  if(CFG.plugin_ok){ recReset(); lvStart(f); }
 }
 $('fileIn').onchange = e=>pick(e.target.files[0]);
 const drop = $('drop');
@@ -350,7 +410,7 @@ let nextVersion = 'fresh';
 $('goBtn').onclick = ()=>{
   if(!file) return; busy(true); stopAll();
   const opts = options(); const fd = new FormData();
-  fd.append('file', file); fd.append('options', JSON.stringify(opts));
+  fd.append('file', file); fd.append('options', JSON.stringify(opts)); if(LV.sid) fd.append('preview_id', LV.sid);
   const x = new XMLHttpRequest(); x.open('POST','/api/convert');
   x.upload.onprogress = e=>{ if(e.lengthComputable) progress(e.loaded/e.total*2, `Subiendo el archivo… ${Math.round(e.loaded/e.total*100)} %`); };
   x.onload = ()=>{ const r = JSON.parse(x.responseText||'{}'); if(x.status!==200){ progress(0, r.error||'Error', true); busy(false); return; } lastOpts = opts; nextVersion = 'fresh'; poll(r.id); };
@@ -399,7 +459,7 @@ $('saveName').oninput = ()=>$('saveName').dataset.auto='0';
 
 // sólo suena un reproductor a la vez; la línea del piano roll sigue al que suena
 const players = ['aWav','aMid','aOrig','origPrev','aMix'];
-function stopAll(except){ players.forEach(id=>{ if(id!==except) $(id).pause(); }); if(except!=='mixer') mixPause(); if(except!=='demo'){ demoAudio.pause(); if(demoBtn){demoBtn.classList.remove('playing');demoBtn.textContent='▶ Escuchar ejemplo';} } }
+function stopAll(except){ if(except!=='live') lvPause(); players.forEach(id=>{ if(id!==except) $(id).pause(); }); if(except!=='mixer') mixPause(); if(except!=='demo'){ demoAudio.pause(); if(demoBtn){demoBtn.classList.remove('playing');demoBtn.textContent='▶ Escuchar ejemplo';} } }
 players.forEach(id=>{ $(id).addEventListener('play', ()=>{ stopAll(id); tick(); }); });
 let raf = null;
 function tick(){
@@ -612,6 +672,134 @@ $('pluginSet').onclick = async ()=>{
   const r = await fetch('/api/plugin-dir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:$('pluginDir').value})}).then(r=>r.json());
   if(r.error){ alert(r.error); return; } init(r);
 };
+
+
+// ---------- preescucha en directo
+// Al elegir el archivo se prepara una vez; luego cada cambio de control vuelve a tocar
+// un fragmento de 10 s con la misma cadena que la conversión final y lo oyes en bucle.
+const LV = {sid:null, ready:false, serial:0, timer:null, buf:null, obuf:null, src:null, g:null, ctx:null,
+            playing:false, ab:'g', start:0, len:10, dur:0, t0:0, off:0, raf:null};
+function lvCtx(){ if(!LV.ctx) LV.ctx = new (window.AudioContext||window.webkitAudioContext)(); return LV.ctx; }
+function lvStat(t, cls){ const e=$('lvStat'); e.textContent=t; e.className='lstat'+(cls?' '+cls:''); }
+function lvRangeTxt(){ $('lvRange').textContent = `${fmtT(LV.start)}–${fmtT(LV.start+LV.len)}`; }
+async function lvStart(f){
+  lvPause(); LV.sid=null; LV.ready=false; LV.buf=null; LV.obuf=null; LV.start=0; LV.serial++;
+  $('live').hidden=false; document.body.classList.add('haslive'); $('lvPlay').disabled=true; $('lvPos').value=0;
+  lvStat('Preparando la preescucha…'); $('lvBar').style.width='0';
+  f.arrayBuffer().then(a=>lvCtx().decodeAudioData(a)).then(b=>{ if(file===f) LV.obuf=b; }).catch(()=>{});
+  const fd = new FormData(); fd.append('file', f); fd.append('options', JSON.stringify(options()));
+  let r; try{ r = await fetch('/api/preview/start',{method:'POST',body:fd}).then(r=>r.json()); }catch(e){ lvStat('No se ha podido preparar la preescucha.','err'); return; }
+  if(file!==f) return;
+  if(r.error){ lvStat(r.error,'err'); return; }
+  LV.sid = r.id;
+  while(file===f){
+    const st = await fetch('/api/preview/'+LV.sid).then(r=>r.json()).catch(()=>({}));
+    if(st.status==='ready'){ LV.dur=st.duration; LV.len=Math.min(10, st.duration); lvRangeTxt(); LV.ready=true; recReady(); lvRequest(); return; }
+    if(st.status==='error' || st.error){ lvStat(st.message||st.error,'err'); return; }
+    lvStat(`Preparando la preescucha… ${Math.round(st.progress||0)} % · ${st.message||''}`);
+    $('lvBar').style.width=(st.progress||0)+'%';
+    await new Promise(r=>setTimeout(r,500));
+  }
+}
+function lvSchedule(){
+  if(!LV.ready || !$('lvAuto').checked) return;
+  clearTimeout(LV.timer); lvStat('Actualizando con los nuevos ajustes…');
+  LV.timer = setTimeout(lvRequest, 300);
+}
+async function lvRequest(){
+  if(!LV.sid) return;
+  const serial = ++LV.serial;
+  let r;
+  try{
+    r = await fetch(`/api/preview/${LV.sid}/play`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({options:options(), start:LV.start, length:LV.len, serial})});
+  }catch(e){ if(serial===LV.serial) lvStat('No se ha podido conectar con la app.','err'); return; }
+  if(serial!==LV.serial || r.status===204) return;
+  if(r.status===202){
+    const j = await r.json(); lvStat(`Volviendo a escuchar las notas del original… ${Math.round(j.progress||0)} %`);
+    setTimeout(()=>{ if(serial===LV.serial) lvRequest(); }, 700); return;
+  }
+  if(!r.ok){ const j = await r.json().catch(()=>({})); lvStat(j.error||'Error en la preescucha','err'); return; }
+  const n = r.headers.get('X-Notes'), ms = r.headers.get('X-Ms'); LV.start = +r.headers.get('X-Start');
+  const buf = await lvCtx().decodeAudioData(await r.arrayBuffer());
+  if(serial!==LV.serial) return;
+  LV.buf = buf; lvRangeTxt(); $('lvPlay').disabled=false;
+  lvStat(`✓ Al día · ${n} notas en este fragmento · ${(ms/1000).toFixed(1).replace('.',',')} s`, 'ok');
+  if(LV.playing && LV.ab==='g') lvPlayFrom(lvPos(), true);
+}
+function lvPos(){ return LV.playing ? ((lvCtx().currentTime - LV.t0) + LV.off) % LV.len : LV.off; }
+function lvPlayFrom(pos, xfade){
+  const ctx = lvCtx(); const src = ctx.createBufferSource(); const g = ctx.createGain();
+  const fade = xfade ? 0.06 : 0.015;
+  if(LV.ab==='g'){ if(!LV.buf) return; src.buffer = LV.buf; src.loop = true; src.loopStart = 0; src.loopEnd = LV.len; src.connect(g); src.start(0, pos); }
+  else { if(!LV.obuf){ lvStat('El navegador no ha podido leer el original para compararlo.','err'); return; }
+    src.buffer = LV.obuf; src.loop = true; src.loopStart = LV.start; src.loopEnd = Math.min(LV.obuf.duration, LV.start+LV.len); src.connect(g); src.start(0, LV.start+pos); }
+  g.connect(ctx.destination); const now = ctx.currentTime;
+  g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(1, now+fade);
+  if(LV.src){ const o=LV.src, og=LV.g; og.gain.cancelScheduledValues(now); og.gain.setValueAtTime(og.gain.value, now); og.gain.linearRampToValueAtTime(0, now+fade); try{ o.stop(now+fade+0.02); }catch(e){} }
+  LV.src = src; LV.g = g; LV.t0 = now; LV.off = pos; LV.playing = true; $('lvPlay').textContent='⏸';
+  cancelAnimationFrame(LV.raf); const loop=()=>{ if(!LV.playing) return; $('lvBar').style.width=(lvPos()/LV.len*100)+'%'; LV.raf=requestAnimationFrame(loop); }; loop();
+}
+function lvPause(){
+  if(!LV.playing) return; LV.off = lvPos(); LV.playing=false; $('lvPlay').textContent='▶';
+  if(LV.src){ const now=lvCtx().currentTime; LV.g.gain.setValueAtTime(LV.g.gain.value, now); LV.g.gain.linearRampToValueAtTime(0, now+0.02); try{ LV.src.stop(now+0.03); }catch(e){} LV.src=null; }
+}
+$('lvPlay').onclick = ()=>{ if(LV.playing){ lvPause(); return; } stopAll('live'); lvCtx().resume(); lvPlayFrom(LV.off||0); };
+function lvAB(w){ LV.ab=w; $('abG').classList.toggle('on', w==='g'); $('abO').classList.toggle('on', w==='o'); if(LV.playing) lvPlayFrom(lvPos(), true); }
+$('abG').onclick = ()=>lvAB('g'); $('abO').onclick = ()=>lvAB('o');
+$('lvAuto').onchange = ()=>{ if($('lvAuto').checked) lvSchedule(); };
+$('lvPos').oninput = ()=>{ LV.start = +$('lvPos').value * Math.max(0, LV.dur-LV.len); lvRangeTxt(); };
+$('lvPos').onchange = ()=>{ LV.off = 0; if(LV.playing && LV.ab==='o') lvPlayFrom(0, true); if(LV.ready){ lvStat('Preparando este fragmento…'); lvRequest(); } };
+
+// ---------- ajuste recomendado
+let recPrev = null;
+function recReset(){ $('recBtn').disabled = true; $('recOut').hidden = true; $('recBarBox').hidden = true;
+  $('recHint').textContent = 'Preparando el análisis del archivo…'; }
+function recReady(){ $('recBtn').disabled = false;
+  $('recHint').textContent = 'Analiza la onda de tu original, prueba los sonidos y ajustes del plugin y aplica la guitarra flamenca que más se le parece (unos 15-30 s).'; }
+function applyOptions(o){
+  if(o.sound && o.sound!==sound){ sound = o.sound; renderSounds(); }
+  setFx();
+  for(const [k,v] of Object.entries(o)){
+    const el = $('o_'+k); if(!el) continue;
+    if(el.tagName==='SELECT') el.value = typeof v==='boolean' ? (v?'1':'0') : String(v);
+    else { el.value = v; if(el.oninput) el.oninput(); }
+  }
+  if(o.levels && sound==='mezcla'){ [0,1].forEach(i=>{ $('lv'+i).value=o.levels[i]; $('lv'+i).oninput(); }); }
+  changed();
+}
+const pct = x => Math.round(x*100)+' %';
+$('recBtn').onclick = async ()=>{
+  if(!LV.sid) return;
+  $('recBtn').disabled = true; $('recOut').hidden = true; $('recBarBox').hidden = false; $('recBar').style.width='0';
+  const r = await fetch(`/api/preview/${LV.sid}/recommend`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({options:options()})}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ $('recHint').textContent = r.error; $('recBtn').disabled=false; $('recBarBox').hidden=true; return; }
+  const sid = LV.sid;
+  while(LV.sid===sid){
+    await new Promise(r=>setTimeout(r,600));
+    const st = await fetch(`/api/preview/${sid}/recommend`).then(r=>r.json()).catch(()=>({}));
+    if(LV.sid!==sid) return;
+    if(st.status==='running'){ $('recBar').style.width=(st.progress||0)+'%'; $('recHint').textContent = st.message||'Analizando…'; continue; }
+    $('recBarBox').hidden = true; $('recBtn').disabled = false;
+    if(st.status!=='done'){ $('recHint').textContent = st.message||st.error||'No he podido calcular el ajuste.'; return; }
+    const res = st.result; recPrev = options();
+    applyOptions(res.options);
+    if(res.windows && res.windows.length && LV.dur > LV.len){ LV.start = Math.min(res.windows[0], LV.dur-LV.len); $('lvPos').value = LV.start/Math.max(1e-6, LV.dur-LV.len); lvRangeTxt(); lvRequest(); }
+    const b = res.before, a = res.after;
+    const chip = (name, bv, av, txt, higher=true)=>{ const better = higher ? av>=bv-1e-9 : av<=bv+1e-9;
+      return `<span>${name}: ${txt(bv)} → <b style="color:${better?'var(--ok)':'var(--gold2)'}">${txt(av)}</b></span>`; };
+    $('recScore').innerHTML =
+      chip('Parecido total', b.total, a.total, v=>pct(Math.max(0,v/1.35))) +
+      chip('Armónico', b.harm, a.harm, pct) +
+      chip('Dinámica', Math.max(0,b.dyn), Math.max(0,a.dyn), pct) +
+      chip('Diferencia de timbre', b.timbre_db, a.timbre_db, v=>v.toFixed(1).replace('.',',')+' dB', false) +
+      `<span>${res.tested} pruebas tocadas con el plugin</span>`;
+    $('recWhy').innerHTML = res.reasons.map(x=>`<li>${x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</li>`).join('');
+    $('recOut').hidden = false; $('recHint').textContent = 'Listo. Puedes volver a calcularlo cuando quieras.';
+    return;
+  }
+};
+$('recUndo').onclick = ()=>{ if(recPrev){ applyOptions(recPrev); recPrev=null; $('recOut').hidden = true; } };
 
 function init(cfg){
   CFG = cfg; $('pluginWarn').style.display = cfg.plugin_ok ? 'none' : 'block';

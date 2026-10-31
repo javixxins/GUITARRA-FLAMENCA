@@ -2,7 +2,8 @@
 
 Crea un plugin de imitación (guitarra sintética en formato Decent Sampler),
 un WAV con acordes, y recorre la app como lo haría el navegador:
-configuración → convertir → descargar WAV/MIDI → mezclar → guardar.
+configuración → preescucha en directo → ajuste recomendado → convertir →
+descargar WAV/MIDI → mezclar → guardar.
 
 Uso:  python pruebas/prueba_rapida.py      (sale con código 0 si todo va bien)
 """
@@ -77,6 +78,10 @@ def test_wav():
     return buf
 
 
+def cfg_ids(cfg):
+    return {x["id"] for x in cfg["sounds"]}
+
+
 def check(cond, msg):
     print(("  ✓ " if cond else "  ✗ ") + msg, flush=True)
     if not cond:
@@ -99,10 +104,36 @@ def main():
     check(c.get("/").status_code == 200, "la página carga")
     check(c.get("/api/demo/estudio").status_code == 200, "demo de sonido")
 
-    print("2. Conversión")
+    print("2. Preescucha en directo")
+    r = c.post("/api/preview/start", data={"file": (test_wav(), "prueba acordes.wav"), "options": "{}"},
+               content_type="multipart/form-data").get_json()
+    pid = r["id"]
+    while (st := c.get(f"/api/preview/{pid}").get_json())["status"] not in ("ready", "error"):
+        time.sleep(0.3)
+    check(st["status"] == "ready", f"preescucha preparada ({st['duration']:.1f} s de audio)")
+    for k, opts in enumerate(({"sound": "estudio"}, {"sound": "escenario", "reverb": 0.5, "sensitivity": 0.7})):
+        t0 = time.time()
+        pr = c.post(f"/api/preview/{pid}/play", json={"options": opts, "start": 0, "length": 5, "serial": k + 1})
+        a, sr = sf.read(io.BytesIO(pr.data))
+        check(pr.status_code == 200 and abs(len(a) / sr - 5) < 0.05 and np.abs(a).max() > 0.01,
+              f"fragmento de {len(a) / sr:.1f} s con {pr.headers['X-Notes']} notas en {time.time() - t0:.1f} s")
+
+    print("3. Ajuste recomendado")
     t0 = time.time()
-    r = c.post("/api/convert", data={"file": (test_wav(), "prueba acordes.wav"),
-                                     "options": json.dumps({"sound": "estudio"})},
+    c.post(f"/api/preview/{pid}/recommend", json={"options": {"sound": "estudio"}})
+    while (rc := c.get(f"/api/preview/{pid}/recommend").get_json())["status"] == "running":
+        time.sleep(0.5)
+    check(rc["status"] == "done", f"calculado en {time.time() - t0:.1f} s ({rc.get('message')})")
+    res = rc["result"]
+    check(res["options"]["sound"] in cfg_ids(cfg) and len(res["reasons"]) >= 3,
+          f"recomienda «{res['options']['sound']}» con {len(res['reasons'])} explicaciones")
+    check(res["after"]["total"] >= res["before"]["total"] - 1e-9,
+          f"parecido {res['before']['total']:.3f} → {res['after']['total']:.3f} (no empeora)")
+
+    print("4. Conversión (reutiliza el análisis de la preescucha)")
+    t0 = time.time()
+    r = c.post("/api/convert", data={"file": (test_wav(), "prueba acordes.wav"), "preview_id": pid,
+                                     "options": json.dumps(res["options"])},
                content_type="multipart/form-data").get_json()
     check("id" in r, "trabajo creado")
     jid = r["id"]
@@ -118,7 +149,7 @@ def main():
     hit = len(expected & set(pitches)) / len(expected)
     check(hit >= 0.6, f"reconoce {hit:.0%} de las notas de los acordes")
 
-    print("3. Archivos")
+    print("5. Archivos")
     w = c.get(f"/api/job/{jid}/wav")
     audio, sr = sf.read(io.BytesIO(w.data))
     check(w.status_code == 200 and audio.ndim == 2 and len(audio) > sr * 4, f"WAV estéreo de {len(audio) / sr:.1f} s")
@@ -126,12 +157,12 @@ def main():
     m = c.get(f"/api/job/{jid}/mid")
     check(m.status_code == 200 and m.data[:4] == b"MThd", "MIDI válido")
 
-    print("4. Mezclador")
+    print("6. Mezclador")
     mx = c.post("/api/mix", json={"tracks": [{"job": jid, "kind": "wav", "gain": 1},
                                              {"job": jid, "kind": "original", "gain": 0.3}]}).get_json()
     check("id" in mx, f"mezcla de {mx.get('duration')} s")
 
-    print("5. Guardar")
+    print("7. Guardar")
     out = os.path.join(TMP, "salida con espacios y ñ")
     s = c.post("/api/save", json={"id": jid, "folder": out, "name": "Prueba (1)",
                                   "formats": ["wav", "mid", "mix"], "mix_id": mx["id"]}).get_json()

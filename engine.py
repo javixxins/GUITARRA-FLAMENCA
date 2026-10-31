@@ -9,6 +9,7 @@
 import logging
 import math
 import os
+import threading
 import warnings
 
 import numpy as np
@@ -28,6 +29,7 @@ from basic_pitch.inference import Model, unwrap_output, window_audio_file  # noq
 from instrument import SOUNDS, SR, load_sample  # noqa: E402
 
 _model = None
+_model_lock = threading.Lock()
 
 
 def get_model():
@@ -46,9 +48,34 @@ def _predict_window(model, x):
 
 # ---------------------------------------------------------------- análisis
 
+class Prepared:
+    """Lo lento del análisis, hecho una sola vez por archivo: audio, modelo de notas y
+    espectro. Con esto, cambiar sensibilidad, limpieza o modo es casi instantáneo."""
+
+    def __init__(self, audio, duration, tempo, tuning, output, remove_percussion):
+        self.audio, self.duration, self.tempo, self.tuning = audio, duration, tempo, tuning
+        self.output, self.remove_percussion = output, remove_percussion
+        self._rise = None
+
+    @property
+    def rise(self):
+        if self._rise is None:
+            self._rise = _harmonic_rise(self.audio)
+        return self._rise
+
+
 def analyze(path, opts, progress):
     """Devuelve (notas, info). Notas = lista de dict(start, end, pitch, vel, bend)."""
-    progress(2, "Leyendo el archivo de audio…")
+    prep = prepare(path, opts, progress)
+    return notes_from(prep, opts, progress)
+
+
+def prepare(path, opts, progress=lambda *a: None, p0=0.0, p1=1.0):
+    """Parte lenta: lee el audio, separa la percusión y pasa el modelo de notas."""
+    def prog(p, msg):  # reparte el progreso entre p0 y p1 (para la preescucha)
+        progress(p0 * 100 + (p1 - p0) * p, msg)
+
+    prog(2, "Leyendo el archivo de audio…")
     audio, _ = librosa.load(path, sr=AUDIO_SAMPLE_RATE, mono=True)
     if len(audio) < AUDIO_SAMPLE_RATE * 0.2:
         raise ValueError("El audio es demasiado corto.")
@@ -58,13 +85,14 @@ def analyze(path, opts, progress):
         raise ValueError("El archivo está en silencio.")
     audio = audio / peak * 0.9  # el modelo trabaja mejor con nivel constante
 
-    if opts.get("remove_percussion", True):
-        progress(3, "Separando la percusión (baterías, palmas, golpes)…")
+    remove_perc = bool(opts.get("remove_percussion", True))
+    if remove_perc:
+        prog(3, "Separando la percusión (baterías, palmas, golpes)…")
         margin = float(opts.get("hpss_margin", 1.0))
         audio = librosa.effects.harmonic(audio, margin=margin).astype(np.float32)
         audio = audio / (np.abs(audio).max() or 1) * 0.9
 
-    progress(4, "Calculando tempo y afinación…")
+    prog(4, "Calculando tempo y afinación…")
     try:
         tempo = float(np.atleast_1d(librosa.beat.beat_track(y=audio, sr=AUDIO_SAMPLE_RATE)[0])[0])
         if not (40 <= tempo <= 240):
@@ -85,14 +113,20 @@ def analyze(path, opts, progress):
     n_win = max(1, math.ceil(len(padded) / hop))
     out = {"note": [], "onset": [], "contour": []}
     for i, (win, _) in enumerate(window_audio_file(padded, hop)):
-        r = _predict_window(model, np.expand_dims(win, axis=0).astype(np.float32))
+        with _model_lock:
+            r = _predict_window(model, np.expand_dims(win, axis=0).astype(np.float32))
         for k in out:
             out[k].append(r[k])
-        progress(6 + 44 * (i + 1) / n_win, f"Escuchando las notas… ({i + 1}/{n_win})")
+        prog(6 + 44 * (i + 1) / n_win, f"Escuchando las notas… ({i + 1}/{n_win})")
     output = {k: unwrap_output(np.concatenate(out[k]), len(audio), n_overlap) for k in out}
     global LAST_OUTPUT
     LAST_OUTPUT = output
+    return Prepared(audio, duration, tempo, tuning, output, remove_perc)
 
+
+def notes_from(prep, opts, progress=lambda *a: None):
+    """Parte rápida: del resultado del modelo a notas, con los ajustes de detección."""
+    audio, output, tempo, tuning, duration = prep.audio, prep.output, prep.tempo, prep.tuning, prep.duration
     progress(51, "Convirtiendo a notas MIDI…")
     sens = float(opts.get("sensitivity", 0.5))  # 0 = pocas notas, 1 = muchas
     onset_t = 0.75 - 0.5 * sens
@@ -117,7 +151,7 @@ def analyze(path, opts, progress):
 
     if opts.get("clean", True) and notes:
         progress(53, "Limpiando notas falsas (re-ataques y armónicos)…")
-        notes = _cleanup(notes, output, audio, opts)
+        notes = _cleanup(notes, output, audio, prep.rise, opts)
 
     if opts.get("mode") == "melodia":
         notes = _monophonic(notes)
@@ -181,7 +215,7 @@ def _harmonic_rise(audio):
 GHOST_INTERVALS = (12, 19, 24, 28, 31, 36)
 
 
-def _cleanup(notes, output, audio, opts):
+def _cleanup(notes, output, audio, rise, opts):
     """Quita las notas que no estaban en el original:
     1. re-ataques falsos: una nota que sigue sonando y se «vuelve a pulsar» sin que
        su energía suba (lo provoca el ataque de otra nota o un vibrato);
@@ -191,7 +225,6 @@ def _cleanup(notes, output, audio, opts):
     """
     times = infer.model_frames_to_time(output["note"].shape[0])
     act = output["note"]
-    rise = _harmonic_rise(audio)
     rise_min = float(opts.get("retrigger_db", 1.5))
 
     # 1) re-ataques falsos -> se funden con la nota anterior de la misma altura
@@ -390,8 +423,8 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
 
     if not dry:
         ref = opts.get("ref_path")
-        orig = None
-        if ref and (float(opts.get("follow_dynamics", 0.7)) > 0 or float(opts.get("copy_timbre", 0.35)) > 0):
+        orig = opts.get("ref_audio")  # ya cargado (preescucha): 44,1 kHz mono, sin percusión
+        if orig is None and ref and (float(opts.get("follow_dynamics", 0.7)) > 0 or float(opts.get("copy_timbre", 0.35)) > 0):
             progress(89, "Analizando la onda del original…")
             orig, _ = librosa.load(ref, sr=SR, mono=True)
             if opts.get("remove_percussion", True):  # timbre y dinámica sólo de la parte musical
@@ -400,7 +433,8 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
             progress(90, "Copiando la dinámica del original…")
             buf = follow_dynamics(buf, orig, float(opts.get("follow_dynamics", 0.7)))
         progress(91, "Ecualizando: timbre del original + nitidez flamenca…")
-        buf = tone_eq(buf, orig, float(opts.get("copy_timbre", 0.35)), float(opts.get("clarity", 0.6)))
+        buf = tone_eq(buf, orig, float(opts.get("copy_timbre", 0.35)), float(opts.get("clarity", 0.6)),
+                      opts.get("_ref_ltas"))
         if float(opts.get("clarity", 0.6)) > 0:
             buf = transient_shaper(buf, 0.5 * float(opts.get("clarity", 0.6)))
         progress(92, "Aplicando filtro y reverb del plugin…")
@@ -415,6 +449,50 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
     progress(95, "Ajustando volumen…")
     peak = float(np.abs(buf).max()) or 1.0
     return (buf * (10 ** (-1 / 20) / peak)).astype(np.float32)
+
+
+def load_reference(path, remove_percussion=True):
+    """El original a 44,1 kHz mono (sin percusión si se pide), para copiar dinámica y timbre."""
+    orig, _ = librosa.load(path, sr=SR, mono=True)
+    if remove_percussion:
+        orig = librosa.effects.harmonic(orig, margin=1.0)
+    return orig.astype(np.float32)
+
+
+def _level_db(x):
+    e = _env_db(x, 2048, 441)
+    return float(np.percentile(e, 95)) if len(e) else -99.0
+
+
+def render_excerpt(notes, sound_id, instrument, opts, ref, start, length, preroll=2.0):
+    """Preescucha: toca sólo un fragmento [start, start+length) con la misma cadena que la
+    conversión final. Empieza a tocar un poco antes (preroll) para que las notas que ya
+    sonaban entren igual, y ajusta el volumen al que tendrá ese fragmento en el archivo final."""
+    total = (len(ref) / SR) if ref is not None else max((n["end"] for n in notes), default=0)
+    start = max(0.0, min(start, max(0.0, total - length)))
+    s0 = max(0.0, start - preroll)
+    t1 = start + length
+    sel = [dict(n, start=n["start"] - s0, end=min(n["end"], t1 + 1.0) - s0)
+           for n in notes if s0 <= n["start"] < t1]
+    n_out = int(length * SR)
+    if not sel:
+        return np.zeros((n_out, 2), np.float32), start, 0
+    r = ref[int(s0 * SR):int((t1 + 1.0) * SR)] if ref is not None else None
+    o = dict(opts, ref_path=None, ref_audio=r)
+    audio = render(sel, sound_id, instrument, o, lambda *a: None)
+    a = int(round((start - s0) * SR))
+    audio = audio[a:a + n_out]
+    if len(audio) < n_out:
+        audio = np.concatenate([audio, np.zeros((n_out - len(audio), 2), np.float32)])
+    # el fragmento sale masterizado a tope; lo bajamos a su nivel real dentro de la pieza
+    if ref is not None and length < total - 0.5:
+        lvl_all = opts.get("_ref_level") if opts.get("_ref_level") is not None else _level_db(ref)
+        lvl_here = _level_db(ref[int(start * SR):int(t1 * SR)])
+        audio = audio * min(1.0, 10 ** (max(-24.0, lvl_here - lvl_all) / 20))
+    f = int(0.01 * SR)  # sin clics al repetir en bucle
+    audio[:f] *= np.linspace(0, 1, f, dtype=np.float32)[:, None]
+    audio[-f:] *= np.linspace(1, 0, f, dtype=np.float32)[:, None]
+    return audio.astype(np.float32), start, len(sel)
 
 
 # ---------------------------------------------------------------- toque de guitarrista
@@ -550,13 +628,13 @@ def clarity_curve(f, amount):
     return np.where(f < 75, hp, curve * amount)
 
 
-def tone_eq(buf, orig, timbre_amount, clarity):
+def tone_eq(buf, orig, timbre_amount, clarity, orig_ltas=None):
     """Ecualizador de fase lineal: copia parte del timbre (balance tonal) del original
     y aplica la curva de nitidez de guitarra flamenca."""
     f = np.linspace(0, SR / 2, 1025)
     total = clarity_curve(f, clarity)
     if orig is not None and timbre_amount > 0:
-        fo, po = _ltas(orig)
+        fo, po = orig_ltas if orig_ltas is not None else _ltas(orig)  # timbre de toda la pieza
         fg, pg = _ltas(buf.mean(axis=1))
         d = _smooth_oct(fo, po - (po.max() - pg.max()) - pg, 3)
         d -= np.median(d[(fo > 200) & (fo < 5000)])     # sólo la forma, no el volumen

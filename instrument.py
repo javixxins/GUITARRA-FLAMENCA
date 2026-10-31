@@ -5,6 +5,7 @@ un XML que dice qué archivo WAV suena en cada nota. Aquí leemos ese XML y
 cargamos los WAV originales para tocarlos nosotros mismos.
 """
 import os
+import threading
 import re
 from collections import OrderedDict
 
@@ -139,14 +140,16 @@ class Layer:
 
 _sample_cache = OrderedDict()
 _CACHE_MAX = 260
+_cache_lock = threading.Lock()  # la preescucha y la conversión pueden cargar a la vez
 
 
 def load_sample(path, max_seconds=8.0):
     """Carga un WAV como float32 estéreo a 44.1 kHz (con caché)."""
     key = (path, max_seconds)
-    if key in _sample_cache:
-        _sample_cache.move_to_end(key)
-        return _sample_cache[key]
+    with _cache_lock:
+        if key in _sample_cache:
+            _sample_cache.move_to_end(key)
+            return _sample_cache[key]
     info = sf.info(path)
     frames = min(info.frames, int(max_seconds * info.samplerate))
     data, sr = sf.read(path, frames=frames, dtype="float32", always_2d=True)
@@ -163,9 +166,10 @@ def load_sample(path, max_seconds=8.0):
     start = int(np.argmax(env > thr))
     start = max(0, start - int(0.003 * SR))
     data = np.ascontiguousarray(data[start:])
-    _sample_cache[key] = data
-    while len(_sample_cache) > _CACHE_MAX:
-        _sample_cache.popitem(last=False)
+    with _cache_lock:
+        _sample_cache[key] = data
+        while len(_sample_cache) > _CACHE_MAX:
+            _sample_cache.popitem(last=False)
     return data
 
 

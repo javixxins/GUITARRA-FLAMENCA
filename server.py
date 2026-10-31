@@ -3,6 +3,7 @@
 Uso:  python server.py [--no-browser]   (Windows, macOS y Linux)
 Usa el primer puerto libre entre 8850 y 8859 (no toca los de otras apps).
 """
+import io
 import json
 import math
 import os
@@ -25,6 +26,7 @@ from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
 import engine
 import instrument
+import recomendar
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(HERE, "trabajos")
@@ -180,7 +182,7 @@ def new_job(**kw):
     return jobs[jid]
 
 
-def run_job(job, opts, reuse_notes=None):
+def run_job(job, opts, reuse_notes=None, prev=None):
     def progress(p, msg):
         job["progress"] = round(float(p), 1)
         job["message"] = msg
@@ -191,7 +193,12 @@ def run_job(job, opts, reuse_notes=None):
             raise RuntimeError("No encuentro el plugin Flamenco Dreams Guitar. " + (_inst["error"] or ""))
         job["status"] = "running"
         with work_lock:
-            if reuse_notes is None:
+            rp = bool(opts.get("remove_percussion", True))
+            prep = prev["preps"].get(rp) if prev else None
+            if reuse_notes is None and prep is not None:
+                progress(50, "Usando el análisis de la preescucha…")
+                notes, info = engine.notes_from(prep, opts, progress)
+            elif reuse_notes is None:
                 notes, info = engine.analyze(job["input"], opts, progress)
             else:
                 notes, info = reuse_notes
@@ -201,6 +208,8 @@ def run_job(job, opts, reuse_notes=None):
                 raise ValueError("No he encontrado notas en el audio. Prueba a subir la sensibilidad.")
             sid = opts.get("sound", "escenario")
             ropts = dict(opts, tuning_cents=info.get("tuning_cents", 0), ref_path=job["input"])
+            if prep is not None and prev["refs"].get(rp) is not None:
+                ropts["ref_audio"] = prev["refs"][rp]  # ya calculado: ahorra unos segundos
             audio = engine.render(notes, sid, inst, ropts, progress)
 
             progress(95, "Midiendo el parecido con el original…")
@@ -271,8 +280,163 @@ def api_convert():
     job = new_job(source=src, basename=f"{src} - guitarra flamenca ({instrument.SOUNDS[sid]['name']})")
     job["input"] = os.path.join(job["dir"], "original.wav")
     f.save(job["input"])
-    threading.Thread(target=run_job, args=(job, opts), daemon=True).start()
+    prev = previews.get(request.form.get("preview_id", ""))
+    threading.Thread(target=run_job, args=(job, opts, None, prev), daemon=True).start()
     return jsonify({"id": job["id"]})
+
+
+# ------------------------------------------------------------------ preescucha en directo
+#
+# Al subir el archivo se hace una vez lo lento (separar la percusión y pasar el modelo de
+# notas). Después, cada vez que se toca un control, se recalculan las notas y se toca sólo
+# un fragmento (~10 s) con la misma cadena que la conversión final: tarda alrededor de 1 s.
+
+previews = {}
+preview_lock = threading.Lock()
+PREVIEW_KEEP = 3
+
+
+def _prepare_preview(sess, rp):
+    def progress(p, msg):
+        sess["progress"], sess["message"] = round(float(p), 1), msg
+    try:
+        sess["status"] = "preparing"
+        prep = engine.prepare(sess["path"], {"remove_percussion": rp}, progress, 0.0, 0.85)
+        progress(86, "Analizando la onda del original…")
+        prep.rise  # el espectro para limpiar notas: mejor ahora que en el primer retoque
+        ref = engine.load_reference(sess["path"], rp)
+        sess["levels"][rp] = engine._level_db(ref)
+        sess["ltas"][rp] = engine._ltas(ref)
+        sess["refs"][rp] = ref
+        sess["preps"][rp] = prep
+        sess["duration"] = prep.duration
+        sess["status"] = "ready"
+        progress(100, "Preescucha lista")
+    except Exception as e:
+        traceback.print_exc()
+        sess["status"], sess["message"] = "error", str(e)
+
+
+@app.route("/api/preview/start", methods=["POST"])
+def api_preview_start():
+    f = request.files.get("file")
+    if not f or not f.filename.lower().endswith((".wav", ".wave")):
+        return jsonify({"error": "El archivo tiene que ser WAV."}), 400
+    opts = json.loads(request.form.get("options", "{}"))
+    for old in sorted(previews.values(), key=lambda x: x["created"])[:-(PREVIEW_KEEP - 1) or None]:
+        previews.pop(old["id"], None)
+        shutil.rmtree(old["dir"], ignore_errors=True)
+    sid = uuid.uuid4().hex[:10]
+    d = os.path.join(JOBS_DIR, "pre_" + sid)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "original.wav")
+    f.save(path)
+    sess = {"id": sid, "dir": d, "path": path, "created": time.time(), "status": "queued", "progress": 0,
+            "message": "Preparando…", "preps": {}, "refs": {}, "levels": {}, "ltas": {}, "serial": 0,
+            "notes_key": None, "notes": None, "info": None, "duration": None}
+    previews[sid] = sess
+    rp = bool(opts.get("remove_percussion", True))
+    threading.Thread(target=_prepare_preview, args=(sess, rp), daemon=True).start()
+    return jsonify({"id": sid})
+
+
+@app.route("/api/preview/<sid>")
+def api_preview_status(sid):
+    sess = previews.get(sid)
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    return jsonify({k: sess.get(k) for k in ("id", "status", "progress", "message", "duration")})
+
+
+DETECTION_KEYS = ("sensitivity", "min_note_ms", "mode", "min_freq", "clean")
+
+
+@app.route("/api/preview/<sid>/play", methods=["POST"])
+def api_preview_play(sid):
+    """Devuelve el fragmento convertido con los ajustes actuales (WAV 16 bits)."""
+    sess = previews.get(sid)
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    data = request.json or {}
+    serial = int(data.get("serial", 0))
+    sess["serial"] = max(sess["serial"], serial)
+    opts = data.get("options", {})
+    rp = bool(opts.get("remove_percussion", True))
+    if rp not in sess["preps"]:
+        if sess["status"] != "preparing":  # han cambiado «quitar percusión»: hay que volver a escuchar
+            threading.Thread(target=_prepare_preview, args=(sess, rp), daemon=True).start()
+        return jsonify({"status": "preparing", "progress": sess["progress"], "message": sess["message"]}), 202
+    inst = get_instrument()
+    if inst is None:
+        return jsonify({"error": "Falta el plugin de guitarra."}), 503
+    with preview_lock:
+        if serial < sess["serial"]:
+            return ("", 204)  # ya hay una petición más nueva: ésta sobra
+        t0 = time.time()
+        key = json.dumps([rp] + [opts.get(k) for k in DETECTION_KEYS])
+        if sess["notes_key"] != key:
+            sess["notes"], sess["info"] = engine.notes_from(sess["preps"][rp], opts)
+            sess["notes_key"] = key
+        notes, info = sess["notes"], sess["info"]
+        sid_sound = opts.get("sound", "estudio")
+        if sid_sound not in instrument.SOUNDS:
+            return jsonify({"error": "Sonido desconocido."}), 400
+        length = float(np.clip(float(data.get("length", 10)), 3, 30))
+        ropts = dict(opts, tuning_cents=info.get("tuning_cents", 0),
+                     _ref_level=sess["levels"][rp], _ref_ltas=sess["ltas"][rp])
+        try:
+            audio, start, n = engine.render_excerpt(notes, sid_sound, inst, ropts, sess["refs"][rp],
+                                                    float(data.get("start", 0)), length)
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"error": f"No he podido preparar la preescucha: {e}"}), 500
+        buf = io.BytesIO()
+        sf.write(buf, audio, instrument.SR, format="WAV", subtype="PCM_16")
+        buf.seek(0)
+        resp = send_file(buf, mimetype="audio/wav")
+        resp.headers["X-Start"] = f"{start:.3f}"
+        resp.headers["X-Notes"] = str(n)
+        resp.headers["X-Total-Notes"] = str(len(notes))
+        resp.headers["X-Ms"] = str(int((time.time() - t0) * 1000))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+
+@app.route("/api/preview/<sid>/recommend", methods=["POST", "GET"])
+def api_preview_recommend(sid):
+    """Ajuste recomendado: analiza la onda del original y prueba ajustes del plugin."""
+    sess = previews.get(sid)
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    if request.method == "GET":
+        r = sess.get("rec") or {"status": "none"}
+        return jsonify({k: v for k, v in r.items()})
+    opts = (request.json or {}).get("options", {})
+    rp = bool(opts.get("remove_percussion", True))
+    if rp not in sess["preps"]:
+        return jsonify({"error": "Espera a que termine de prepararse la preescucha."}), 409
+    if (sess.get("rec") or {}).get("status") == "running":
+        return jsonify({"ok": True})
+    inst = get_instrument()
+    if inst is None:
+        return jsonify({"error": "Falta el plugin de guitarra."}), 503
+    rec = {"status": "running", "progress": 0, "message": "Empezando…"}
+    sess["rec"] = rec
+
+    def progress(p, msg):
+        rec["progress"], rec["message"] = round(float(p), 1), msg
+
+    def work():
+        try:
+            rec["result"] = recomendar.recommend(sess["path"], sess["preps"][rp], sess["refs"][rp],
+                                                 sess["levels"][rp], sess["ltas"][rp], inst, opts,
+                                                 progress, preview_lock)
+            rec["status"] = "done"
+        except Exception as e:
+            traceback.print_exc()
+            rec["status"], rec["message"] = "error", f"No he podido calcular el ajuste: {e}"
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/rerender", methods=["POST"])

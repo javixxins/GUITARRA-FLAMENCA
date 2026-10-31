@@ -10,6 +10,10 @@ sin subir nada a Internet.
 - Las vuelve a tocar con muestras reales de guitarra flamenca (plugin gratuito
   *Flamenco Dreams Guitar V2*), con rasgueo y trémolo.
 - Copia la dinámica y el timbre del original, y masteriza el resultado.
+- **Preescucha en directo**: mientras mueves cualquier control, escuchas en bucle cómo quedará
+  (≈1 s por cambio), y puedes compararlo con el original.
+- **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
+  plugin y aplica el que más se le parece, explicando por qué. Luego puedes retocarlo.
 - Escucha el resultado al momento, mézclalo con el original y guárdalo en la carpeta que elijas.
 
 ![Prueba en Windows y Mac](https://github.com/javixxins/GUITARRA-FLAMENCA/actions/workflows/prueba.yml/badge.svg)
@@ -55,8 +59,10 @@ la app la encuentra sola. Si no, al abrirla te pedirá que elijas la carpeta.
 
 La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto libre hasta el 8859).
 
-1. Sube tu WAV.
-2. Elige el sonido (puedes escuchar una demo de cada uno) y, si quieres, ajusta la fidelidad.
+1. Sube tu WAV. Abajo aparece la **preescucha en directo**: pulsa ▶ y suena en bucle un fragmento
+   ya convertido. Usa *Guitarra / Original* para comparar y la barra para elegir otro fragmento.
+2. Pulsa **✨ Ajuste recomendado**, o elige el sonido y ajusta los controles a mano.
+   Cada cambio se oye al momento en la preescucha.
 3. Convierte y mira la barra de progreso.
 4. Escucha la guitarra, el MIDI y el original.
 5. Mezcla pistas, por ejemplo guitarra más un poco del original.
@@ -91,6 +97,36 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
    - Masterización: compresión suave y limitador a −1 dBFS.
 6. Se mide el **parecido armónico** con el original y se muestra en la app.
 
+### Preescucha en directo
+Al subir el archivo se hace una sola vez la parte lenta: separar la percusión y pasar el modelo
+de notas. Después, cada cambio de control recalcula las notas y toca solo un fragmento de 10 s
+con la misma cadena que la conversión final. El fragmento empieza un poco antes, para que entren
+las notas que ya sonaban, y se ajusta a su volumen real dentro de la pieza. Comparado con el
+archivo final, el fragmento queda así:
+
+| Aspecto | Diferencia con el archivo final |
+|---|---|
+| Ritmo | 0 ms de desfase |
+| Dinámica | correlación ≥ 0,97 |
+| Volumen | ±2 dB |
+| Timbre | ±1-3 dB |
+
+La conversión final reutiliza ese análisis y tarda la mitad.
+
+### Ajuste recomendado (`recomendar.py`)
+1. **Mide el original**: cuánta percusión tiene, si las notas se sostienen (voz, cuerda) o se
+   apagan (piano, pulsado), cuántos acordes hay, si los pasajes son rápidos, si hay notas fuera
+   del registro de la guitarra, cuánto ambiente o reverb tiene y cuánto contraste de volumen.
+2. **Prueba con el plugin**: toca fragmentos reales con los 4 sonidos y con varias
+   sensibilidades, cantidades de timbre copiado y de dinámica copiada. Puntúa cada prueba contra
+   el original por:
+   - parecido armónico
+   - parecido de dinámica
+   - parecido de timbre
+3. **Aplica la mejor combinación** con límites que mantienen el sonido de guitarra flamenca
+   limpia (nitidez alta, timbre copiado como máximo 50 %). Muestra el antes y el después y el
+   porqué de cada decisión.
+
 ### Sonidos
 | Sonido | Origen en el plugin |
 |---|---|
@@ -100,8 +136,8 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
 | Flamenco Dreams V1 | V1, con reverb |
 
 ### Pruebas
-- `pruebas/prueba_rapida.py` recorre la app de punta a punta: convertir, WAV, MIDI, mezcla y
-  guardado. Usa una guitarra sintética, así que no necesita el plugin. Se ejecuta en Windows y Mac
+- `pruebas/prueba_rapida.py` recorre la app de punta a punta: preescucha, ajuste recomendado,
+  conversión, WAV, MIDI, mezcla y guardado. Usa una guitarra sintética, así que no necesita el plugin. Se ejecuta en Windows y Mac
   en cada cambio (GitHub Actions).
 - `pruebas/banco.py` mide la fidelidad con audios de notas conocidas (necesita el plugin).
   Resultado medio:
@@ -115,6 +151,7 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
 | `server.py` | servidor web local (Flask) |
 | `engine.py` | detección de notas y síntesis |
 | `instrument.py` | lectura del plugin |
+| `recomendar.py` | ajuste recomendado |
 | `index.html` | la interfaz |
 | `instalar.*`, `Iniciar…`, `Parar…` | instalar, abrir y cerrar (`.bat` en Windows, `.command` en Mac) |
 | `make_icon.py` | dibuja el icono |
