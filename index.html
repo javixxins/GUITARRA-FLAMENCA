@@ -106,6 +106,16 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 @media (max-width:760px){.track{grid-template-columns:14px 1fr auto auto}.track .vol,.track .pan{grid-column:2 / -1}.masterrow{grid-template-columns:1fr}}
 @media (max-width:640px){.player{grid-template-columns:1fr}.save{grid-template-columns:1fr}.mix.show{grid-template-columns:1fr}.hero{min-height:150px}}
 
+/* ---- reverb y ecualizador */
+.fxcols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:12px}
+.fxcols h3{font-family:Fraunces,Georgia,serif;font-size:16px;margin:0 0 8px;color:var(--text)}
+.fxcols .grid{grid-template-columns:1fr;margin-top:10px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 11px;font:inherit;font-size:13px;cursor:pointer}
+.presets button:hover{border-color:var(--gold)}
+.presets button.on{background:var(--gold);border-color:var(--gold);color:#1a120c;font-weight:600}
+.eqcurve{width:100%;height:70px;display:block;margin-top:10px;background:#0d0907;border:1px solid var(--line);border-radius:8px}
+@media (max-width:760px){.fxcols{grid-template-columns:1fr}}
 /* ---- ajuste recomendado */
 .recbox{border:1px solid var(--gold);background:linear-gradient(135deg,rgba(209,157,97,.12),rgba(184,50,42,.08));border-radius:12px;padding:14px;margin-bottom:16px}
 .rechead{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
@@ -187,8 +197,24 @@ body.haslive main{padding-bottom:150px}
       <div class="ctl"><label>Guitarra de Escenario <span id="lv1v"></span></label><input type="range" id="lv1" min="0" max="1" step="0.05"></div>
     </div>
     <details>
-      <summary>Controles del plugin (volumen, tono, reverb, ataque, release)</summary>
+      <summary>Controles del plugin (volumen, tono, ataque, release)</summary>
       <div class="grid" id="fxGrid"></div>
+    </details>
+    <details open>
+      <summary>Reverb y ecualizador de la guitarra</summary>
+      <div class="fxcols">
+        <div>
+          <h3>Reverb</h3>
+          <div class="presets" id="revPresets"></div>
+          <div class="grid" id="revGrid"></div>
+        </div>
+        <div>
+          <h3>Ecualizador</h3>
+          <div class="presets" id="eqPresets"></div>
+          <canvas class="eqcurve" id="eqCurve"></canvas>
+          <div class="grid" id="eqGrid"></div>
+        </div>
+      </div>
     </details>
     <details open>
       <summary>Fidelidad y sonido de guitarra flamenca</summary>
@@ -302,10 +328,36 @@ const fmt = (v, d=2) => Number(v).toFixed(d);
 const FX = [
   {k:'volume', l:'Volumen', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
   {k:'filter', l:'Tono (filtro)', min:500, max:22000, step:100, f:v=>v>=20000?'abierto':(v/1000).toFixed(1)+' kHz', s:'Bájalo para un sonido más cálido y oscuro'},
-  {k:'reverb', l:'Reverb', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
-  {k:'room', l:'Tamaño de la sala', min:0, max:1, step:.01, f:v=>Math.round(v*100)+' %'},
   {k:'attack', l:'Ataque', min:0.001, max:0.5, step:.001, f:v=>Math.round(v*1000)+' ms'},
   {k:'release', l:'Release (resonancia al soltar)', min:0.05, max:5, step:.05, f:v=>fmt(v)+' s'},
+];
+const REV = [
+  {k:'reverb', l:'Cantidad', min:0, max:0.8, step:.01, v:.15, f:v=>v==0?'sin reverb':Math.round(v*100)+' %'},
+  {k:'room', l:'Tamaño de la sala', min:0, max:1, step:.01, v:.45, f:v=>(0.3+3.5*v).toFixed(1).replace('.',',')+' s de cola', s:'Cuánto dura la cola de la reverb'},
+  {k:'damping', l:'Calidez', min:0, max:1, step:.01, v:.2, f:v=>Math.round(v*100)+' %', s:'Más alta = la cola pierde agudos, más suave y cálida'},
+  {k:'predelay', l:'Pre-delay', min:0, max:0.08, step:.001, v:.012, f:v=>Math.round(v*1000)+' ms', s:'Separa el ataque de la reverb: más definición'},
+];
+const REV_PRESETS = [
+  ['Seca', {reverb:0}],
+  ['Estudio', {reverb:.12, room:.3, damping:.3, predelay:.01}],
+  ['Tablao', {reverb:.2, room:.4, damping:.45, predelay:.015}],
+  ['Patio andaluz', {reverb:.22, room:.55, damping:.2, predelay:.03}],
+  ['Sala de conciertos', {reverb:.3, room:.75, damping:.35, predelay:.025}],
+  ['Iglesia', {reverb:.42, room:1, damping:.5, predelay:.045}],
+];
+const EQ = [
+  {k:'eq_low', l:'Graves · 100 Hz', min:-12, max:12, step:.5, v:0, f:v=>(v>0?'+':'')+String(v).replace('.',',')+' dB'},
+  {k:'eq_body', l:'Cuerpo · 250 Hz', min:-12, max:12, step:.5, v:0, f:v=>(v>0?'+':'')+String(v).replace('.',',')+' dB'},
+  {k:'eq_mid', l:'Medios · 1 kHz', min:-12, max:12, step:.5, v:0, f:v=>(v>0?'+':'')+String(v).replace('.',',')+' dB'},
+  {k:'eq_presence', l:'Presencia · 3,5 kHz', min:-12, max:12, step:.5, v:0, f:v=>(v>0?'+':'')+String(v).replace('.',',')+' dB'},
+  {k:'eq_air', l:'Aire · 10 kHz', min:-12, max:12, step:.5, v:0, f:v=>(v>0?'+':'')+String(v).replace('.',',')+' dB'},
+];
+const EQ_PRESETS = [
+  ['Plano', {eq_low:0, eq_body:0, eq_mid:0, eq_presence:0, eq_air:0}],
+  ['Flamenco nítido', {eq_low:-2, eq_body:-2, eq_mid:0, eq_presence:3, eq_air:2}],
+  ['Cálida', {eq_low:2, eq_body:1.5, eq_mid:0, eq_presence:-1.5, eq_air:-2}],
+  ['Con cuerpo', {eq_low:3, eq_body:2, eq_mid:-1, eq_presence:1, eq_air:0}],
+  ['Brillante', {eq_low:-1, eq_body:-1, eq_mid:0, eq_presence:2, eq_air:4}],
 ];
 const QUAL = [
   {k:'follow_dynamics', l:'Copiar la dinámica del original', min:0, max:1, step:.05, v:.7, f:v=>Math.round(v*100)+' %', s:'Crescendos, acentos y silencios iguales que en el original'},
@@ -343,19 +395,20 @@ function ctl(def, val, grid){
 function setFx(){
   const s = CFG.sounds.find(x=>x.id===sound);
   $('fxGrid').innerHTML=''; FX.forEach(d=>ctl(d, s.fx[d.k], $('fxGrid')));
+  REV.forEach(d=>{ if(s.fx[d.k]!==undefined) setCtl(d.k, s.fx[d.k]); });
   const mix = sound==='mezcla'; $('mixBox').classList.toggle('show', mix);
   if(mix){ [0,1].forEach(i=>{ const r=$('lv'+i); r.value=s.layers[i].level; const u=()=>$('lv'+i+'v').textContent=Math.round(r.value*100)+' %'; u(); r.oninput=()=>{u();changed();}; }); }
 }
 
 function options(){
   const o = {sound};
-  FX.concat(DET, QUAL).forEach(d=>{ const el=$('o_'+d.k); if(el) o[d.k] = d.type==='select' ? el.value : +el.value; });
+  FX.concat(REV, EQ, DET, QUAL).forEach(d=>{ const el=$('o_'+d.k); if(el) o[d.k] = d.type==='select' ? el.value : +el.value; });
   o.follow_tuning = o.follow_tuning==='1'; o.bits = +o.bits;
   ['guitar_register','remove_percussion','clean'].forEach(k=>{ if(k in o) o[k] = o[k]==='1'; });
   if(sound==='mezcla') o.levels = [+$('lv0').value, +$('lv1').value];
   return o;
 }
-function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); lvSchedule(); }
+function changed(){ if(job && job.status==='done') $('reBox').hidden = JSON.stringify(options())===JSON.stringify(lastOpts); lvSchedule(); markPresets(); drawEq(); }
 
 function renderSounds(){
   $('sounds').innerHTML = CFG.sounds.map(s=>`
@@ -801,14 +854,52 @@ $('recBtn').onclick = async ()=>{
 };
 $('recUndo').onclick = ()=>{ if(recPrev){ applyOptions(recPrev); recPrev=null; $('recOut').hidden = true; } };
 
+// ---------- reverb y ecualizador
+function setCtl(k, v){ const el=$('o_'+k); if(!el) return; el.value=v; if(el.oninput) el.oninput(); else if(el.onchange) el.onchange(); }
+function presetRow(box, list, defs){
+  $(box).innerHTML = list.map((p,i)=>`<button data-i="${i}">${p[0]}</button>`).join('');
+  $(box).querySelectorAll('button').forEach(b=>b.onclick = ()=>{
+    const vals = list[+b.dataset.i][1];
+    defs.forEach(d=>{ if(vals[d.k]!==undefined) setCtl(d.k, vals[d.k]); });
+    markPresets();
+  });
+}
+function markPresets(){
+  [['revPresets', REV_PRESETS], ['eqPresets', EQ_PRESETS]].forEach(([box, list])=>{
+    const bs = $(box) ? $(box).querySelectorAll('button') : [];
+    bs.forEach(b=>{ const vals = list[+b.dataset.i][1];
+      const on = Object.entries(vals).every(([k,v])=>{ const el=$('o_'+k); return el && Math.abs(+el.value - v) < 1e-6; });
+      b.classList.toggle('on', on); });
+  });
+}
+function drawEq(){
+  const c = $('eqCurve'); if(!c || !$('o_eq_low')) return;
+  const w = c.clientWidth, h = c.clientHeight, dpr = window.devicePixelRatio||1;
+  if(!w) return; c.width = w*dpr; c.height = h*dpr; const g = c.getContext('2d'); g.scale(dpr,dpr);
+  const band = [['eq_low','ls',100],['eq_body','b',250],['eq_mid','b',1000],['eq_presence','b',3500],['eq_air','hs',10000]];
+  const db = f=>band.reduce((t,[k,ty,fc])=>{ const G=+$('o_'+k).value, x=Math.log2(f/fc);
+    return t + (ty==='ls' ? G/(1+Math.exp(x*3)) : ty==='hs' ? G/(1+Math.exp(-x*3)) : G/(1+(x*1.8)**2)); }, 0);
+  const X = f=>Math.log(f/40)/Math.log(16000/40)*w, Y = d=>h/2 - d/14*(h/2-6);
+  g.strokeStyle='#3a2b20'; g.lineWidth=1;
+  [100,250,1000,3500,10000].forEach(f=>{ g.beginPath(); g.moveTo(X(f),0); g.lineTo(X(f),h); g.stroke(); });
+  g.beginPath(); g.moveTo(0,h/2); g.lineTo(w,h/2); g.stroke();
+  g.strokeStyle='#e8b878'; g.lineWidth=2; g.beginPath();
+  for(let i=0;i<=w;i+=2){ const f = 40*Math.pow(16000/40, i/w); const y = Y(db(f)); i ? g.lineTo(i,y) : g.moveTo(i,y); }
+  g.stroke();
+}
+window.addEventListener('resize', drawEq);
+
 function init(cfg){
   CFG = cfg; $('pluginWarn').style.display = cfg.plugin_ok ? 'none' : 'block';
   $('pluginErr').textContent = cfg.plugin_error||''; $('pluginDir').value = cfg.plugin_dir;
   $('folder').value = $('folder').value || cfg.last_folder;
+  if(!$('revGrid').children.length){ REV.forEach(d=>ctl(d, d.v, $('revGrid'))); presetRow('revPresets', REV_PRESETS, REV); }
+  if(!$('eqGrid').children.length){ EQ.forEach(d=>ctl(d, d.v, $('eqGrid'))); presetRow('eqPresets', EQ_PRESETS, EQ); }
   renderSounds(); setFx();
   if(!$('detGrid').children.length) DET.forEach(d=>ctl(d, d.v, $('detGrid')));
   if(!$('qualGrid').children.length) QUAL.forEach(d=>ctl(d, d.v, $('qualGrid')));
   $('goBtn').disabled = !file || !cfg.plugin_ok;
+  markPresets(); drawEq();
 }
 fetch('/api/config').then(r=>r.json()).then(init);
 </script>

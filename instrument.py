@@ -22,7 +22,7 @@ SOUNDS = OrderedDict([
         "desc": "La guitarra Manuel Rodríguez grabada en estudio: limpia, nítida y con cuerpo. "
                 "La más fiel para que suene como una grabación profesional.",
         "preset": "V2", "layers": [("StudioGuitar", 0.8)],
-        "fx": {"reverb": 0.15, "room": 0.45, "damping": 0.2, "attack": 0.002, "release": 0.8,
+        "fx": {"reverb": 0.15, "room": 0.45, "damping": 0.2, "predelay": 0.012, "attack": 0.002, "release": 0.8,
                "filter": 22000, "volume": 0.9},
     }),
     ("escenario", {
@@ -31,7 +31,7 @@ SOUNDS = OrderedDict([
         "desc": "La guitarra Manuel Rodríguez grabada al aire libre, sobre el escenario. "
                 "Sonido rústico y gitano. Es el sonido por defecto del plugin V2.",
         "preset": "V2", "layers": [("StageGuitar", 0.8)],
-        "fx": {"reverb": 0.2, "room": 0.85, "damping": 0.2, "attack": 0.002, "release": 0.8,
+        "fx": {"reverb": 0.2, "room": 0.85, "damping": 0.2, "predelay": 0.012, "attack": 0.002, "release": 0.8,
                "filter": 22000, "volume": 0.9},
     }),
     ("mezcla", {
@@ -40,7 +40,7 @@ SOUNDS = OrderedDict([
         "desc": "Mezcla las dos grabaciones como los dos deslizadores del plugin V2. "
                 "Puedes ajustar el nivel de cada una.",
         "preset": "V2", "layers": [("StudioGuitar", 0.6), ("StageGuitar", 0.8)],
-        "fx": {"reverb": 0.25, "room": 0.85, "damping": 0.2, "attack": 0.002, "release": 0.8,
+        "fx": {"reverb": 0.25, "room": 0.85, "damping": 0.2, "predelay": 0.012, "attack": 0.002, "release": 0.8,
                "filter": 22000, "volume": 0.9},
     }),
     ("v1", {
@@ -49,7 +49,7 @@ SOUNDS = OrderedDict([
         "desc": "El preset original de la versión 1: guitarra de estudio con la reverb "
                 "amplia del plugin V1 (45 %).",
         "preset": "V1", "layers": [("__main__", 1.0)],
-        "fx": {"reverb": 0.45, "room": 0.7, "damping": 0.3, "attack": 0.002, "release": 1.0,
+        "fx": {"reverb": 0.45, "room": 0.7, "damping": 0.3, "predelay": 0.02, "attack": 0.002, "release": 1.0,
                "filter": 22000, "volume": 0.9},
     }),
 ])

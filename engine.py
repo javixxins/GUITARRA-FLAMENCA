@@ -6,6 +6,7 @@
    igual que lo haría DecentSampler (round robin, velocidad, ataque, release).
 3. Aplica los efectos del plugin (filtro y reverb) y exporta WAV y MIDI.
 """
+import functools
 import logging
 import math
 import os
@@ -434,7 +435,7 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
             buf = follow_dynamics(buf, orig, float(opts.get("follow_dynamics", 0.7)))
         progress(91, "Ecualizando: timbre del original + nitidez flamenca…")
         buf = tone_eq(buf, orig, float(opts.get("copy_timbre", 0.35)), float(opts.get("clarity", 0.6)),
-                      opts.get("_ref_ltas"))
+                      opts.get("_ref_ltas"), opts)
         if float(opts.get("clarity", 0.6)) > 0:
             buf = transient_shaper(buf, 0.5 * float(opts.get("clarity", 0.6)))
         progress(92, "Aplicando filtro y reverb del plugin…")
@@ -442,7 +443,7 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
             sos = signal.butter(4, max(60.0, fx["filter"]), fs=SR, output="sos")
             buf = signal.sosfilt(sos, buf, axis=0).astype(np.float32)
         if fx["reverb"] > 0.001:
-            buf = reverb(buf, fx["reverb"], fx["room"], fx["damping"])
+            buf = reverb(buf, fx["reverb"], fx["room"], fx["damping"], fx.get("predelay", 0.012))
         progress(94, "Masterizando (compresión suave y limitador)…")
         buf = master(buf, float(opts.get("mastering", 0.5)), float(fx["volume"]))
         return buf.astype(np.float32)
@@ -628,11 +629,39 @@ def clarity_curve(f, amount):
     return np.where(f < 75, hp, curve * amount)
 
 
-def tone_eq(buf, orig, timbre_amount, clarity, orig_ltas=None):
+EQ_BANDS = (  # (opción, tipo, frecuencia, q) — ecualizador de 5 bandas del usuario, en dB
+    ("eq_low", "lowshelf", 100, 0),
+    ("eq_body", "bell", 250, 0.9),
+    ("eq_mid", "bell", 1000, 0.9),
+    ("eq_presence", "bell", 3500, 0.9),
+    ("eq_air", "highshelf", 10000, 0),
+)
+
+
+def user_eq_curve(f, opts):
+    """Curva (dB) del ecualizador de 5 bandas: graves, cuerpo, medios, presencia y aire."""
+    lf = np.log2(np.maximum(f, 1))
+    total = np.zeros_like(f, dtype=float)
+    for key, kind, fc, q in EQ_BANDS:
+        g = float(np.clip(float(opts.get(key, 0) or 0), -12, 12))
+        if g == 0:
+            continue
+        if kind == "lowshelf":
+            total += g / (1 + np.exp((lf - np.log2(fc)) * 3))
+        elif kind == "highshelf":
+            total += g / (1 + np.exp(-(lf - np.log2(fc)) * 3))
+        else:
+            total += g / (1 + ((lf - np.log2(fc)) * 2 * q) ** 2)
+    return total
+
+
+def tone_eq(buf, orig, timbre_amount, clarity, orig_ltas=None, user_eq=None):
     """Ecualizador de fase lineal: copia parte del timbre (balance tonal) del original
     y aplica la curva de nitidez de guitarra flamenca."""
     f = np.linspace(0, SR / 2, 1025)
     total = clarity_curve(f, clarity)
+    if user_eq:
+        total = total + user_eq_curve(f, user_eq)
     if orig is not None and timbre_amount > 0:
         fo, po = orig_ltas if orig_ltas is not None else _ltas(orig)  # timbre de toda la pieza
         fg, pg = _ltas(buf.mean(axis=1))
@@ -689,24 +718,47 @@ def master(buf, amount, volume=0.9):
     return np.clip(x, -ceil, ceil).astype(np.float32)
 
 
-def reverb(x, wet, room, damping):
-    """Reverb de sala (respuesta al impulso sintética, convolución por FFT)."""
-    rt60 = 0.6 + 3.2 * float(room)
-    n = int(min(rt60, 4.5) * SR)
+@functools.lru_cache(maxsize=16)
+def _reverb_ir(room, damping, predelay):
+    """Respuesta al impulso de una sala: reflexiones tempranas (las paredes cercanas) y una
+    cola difusa que se apaga en rt60 segundos y se oscurece con el tiempo (damping)."""
+    rt60 = 0.3 + 3.5 * room
+    n = int(min(rt60 * 1.1, 5.0) * SR)
     rng = np.random.default_rng(7)
     t = np.arange(n) / SR
     decay = np.exp(-6.9 * t / rt60)
-    ir = np.zeros((n, 2), np.float32)
     bright = rng.standard_normal((n, 2))
     dark = signal.sosfilt(signal.butter(2, 2500, fs=SR, output="sos"), rng.standard_normal((n, 2)), axis=0) * 2.2
-    mix = np.exp(-t * (1 + 8 * float(damping)))[:, None]
-    ir[:] = ((bright * mix + dark * (1 - mix)) * decay[:, None]).astype(np.float32)
-    pre = int(0.012 * SR)
-    ir = np.concatenate([np.zeros((pre, 2), np.float32), ir])
+    mix = np.exp(-t * (1 + 8 * damping))[:, None]
+    late = (bright * mix + dark * (1 - mix)) * decay[:, None]
+    # la cola llega un poco después de las primeras reflexiones (más tarde cuanto mayor la sala)
+    onset = int((0.008 + 0.04 * room) * SR)
+    late[:onset] *= np.linspace(0, 1, onset)[:, None] ** 2
+    late /= np.sqrt((late ** 2).sum(axis=0, keepdims=True)) + 1e-9
+    early = np.zeros((n, 2))
+    span = 0.006 + 0.05 * room
+    for c in range(2):  # 8 reflexiones distintas por lado: da anchura estéreo
+        times = np.sort(rng.uniform(0.002, span, 8))
+        gains = np.linspace(0.55, 0.15, 8) * rng.choice([-1, 1], 8) * (1 - 0.6 * damping * np.linspace(0, 1, 8))
+        early[(times * SR).astype(int), c] += gains
+    early = signal.sosfilt(signal.butter(1, 6000 - 3500 * damping, fs=SR, output="sos"), early, axis=0)
+    ir = early * 0.9 + late
+    ir = np.concatenate([np.zeros((int(predelay * SR), 2)), ir])
     ir /= np.sqrt((ir ** 2).sum(axis=0, keepdims=True)) + 1e-9
+    return ir.astype(np.float32)
+
+
+_REVERB_LOWCUT = signal.butter(2, 180, btype="highpass", fs=SR, output="sos")
+
+
+def reverb(x, wet, room, damping, predelay=0.012):
+    """Reverb de sala por convolución. wet = cantidad, room = tamaño (duración de la cola),
+    damping = calidez (cuánto se apagan los agudos de la cola), predelay en segundos."""
+    ir = _reverb_ir(round(float(room), 2), round(float(damping), 2), round(float(predelay), 3))
     tail = np.zeros((len(ir), 2), np.float32)
     xx = np.concatenate([x, tail])
     w = np.stack([signal.oaconvolve(xx[:, c], ir[:, c])[: len(xx)] for c in range(2)], 1)
+    w = signal.sosfilt(_REVERB_LOWCUT, w, axis=0)  # sin graves en la cola: la guitarra no se embarra
     w *= np.abs(xx).max() / (np.abs(w).max() + 1e-9) * 0.7
     out = xx * (1 - 0.5 * wet) + w * wet
     nz = np.nonzero(np.abs(out).max(axis=1) > 1e-5)[0]

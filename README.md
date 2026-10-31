@@ -12,6 +12,9 @@ sin subir nada a Internet.
 - Copia la dinámica y el timbre del original, y masteriza el resultado.
 - **Preescucha en directo**: mientras mueves cualquier control, escuchas en bucle cómo quedará
   (≈1 s por cambio), y puedes compararlo con el original.
+- **Reverb y ecualizador de la guitarra**, con estilos listos para usar:
+  - Reverb: Seca, Estudio, Tablao, Patio andaluz, Sala de conciertos, Iglesia.
+  - Ecualizador de 5 bandas: Plano, Flamenco nítido, Cálida, Con cuerpo, Brillante.
 - **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
   plugin y aplica el que más se le parece, explicando por qué. Luego puedes retocarlo.
 - Escucha el resultado al momento, mézclalo con el original y guárdalo en la carpeta que elijas.
@@ -96,6 +99,15 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
    - Filtro y reverb del plugin.
    - Masterización: compresión suave y limitador a −1 dBFS.
 6. Se mide el **parecido armónico** con el original y se muestra en la app.
+
+### Reverb y ecualizador
+- **Reverb** de sala por convolución:
+  - reflexiones tempranas con anchura estéreo y una cola difusa;
+  - controles de cantidad, tamaño (duración de la cola), calidez (cuánto se apagan los agudos) y pre-delay;
+  - la cola no lleva graves, para que la guitarra no se embarre.
+- **Ecualizador** de fase lineal, solo para la guitarra:
+  - 5 bandas: graves 100 Hz, cuerpo 250 Hz, medios 1 kHz, presencia 3,5 kHz y aire 10 kHz;
+  - ±12 dB por banda, con la curva dibujada en pantalla.
 
 ### Preescucha en directo
 Al subir el archivo se hace una sola vez la parte lenta: separar la percusión y pasar el modelo
