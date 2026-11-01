@@ -197,7 +197,8 @@ def voice_lead(labels, capo, flavor="flamenco", weight=0.35):
     for step in range(len(idx) - 1, -1, -1):
         i = idx[step]
         nm, fr, _ = cands[i][k]
-        choice[i] = {"name": nm, "frets": list(fr), "capo": capo, "notes": notes_of(fr, capo)}
+        label = nm if not capo else f"forma de {nm} (cejilla {capo})"
+        choice[i] = {"name": label, "shape": nm, "frets": list(fr), "capo": capo, "notes": notes_of(fr, capo)}
         if step > 0:
             k = back[step - 1][k]
     return choice

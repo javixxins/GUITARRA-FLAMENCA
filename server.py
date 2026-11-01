@@ -30,6 +30,7 @@ import recomendar
 import acordes
 import guitarra_ritmica
 import ritmo_original
+import exportar
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(HERE, "trabajos")
@@ -634,6 +635,79 @@ def api_chords_render():
             job["sound"] = sid_sound
             job["status"] = "done"
             progress(100, "¡Guitarra rítmica lista!")
+        except Exception as e:
+            traceback.print_exc()
+            job["status"], job["message"] = "error", str(e)
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify({"id": job["id"]})
+
+
+# ------------------------------------------------------------------ exportar vídeo y PDF de acordes
+
+def _export_data(body):
+    d = body.get("data") or {}
+    segs = [{"start": float(x["start"]), "end": float(x["end"]), "label": x.get("label") or "N",
+             "root": x.get("root"), "quality": x.get("quality")} for x in d.get("segments", [])]
+    if not any(x["root"] is not None for x in segs):
+        raise ValueError("No hay acordes que exportar.")
+    d["segments"] = segs
+    return d
+
+
+@app.route("/api/chords/export", methods=["POST"])
+def api_chords_export():
+    """Exporta los acordes a la carpeta elegida: PDF (al momento) o vídeo backtrack (con progreso)."""
+    body = request.json or {}
+    folder = os.path.expanduser((body.get("folder") or "").strip())
+    if not folder:
+        return jsonify({"error": "Elige una carpeta."}), 400
+    try:
+        os.makedirs(folder, exist_ok=True)
+        data = _export_data(body)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        return jsonify({"error": f"No puedo usar la carpeta {folder}"}), 400
+    name = safe_name(body.get("name") or data.get("title") or "acordes")
+    if body.get("kind") == "pdf":
+        dst = _unique(os.path.join(folder, f"{name} - acordes.pdf"))
+        try:
+            exportar.render_pdf(data, dst)
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"error": f"No he podido crear el PDF: {e}"}), 500
+        save_config(last_folder=folder)
+        return jsonify({"saved": dst})
+
+    sess = previews.get(body.get("sid", ""))
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    q = body.get("quality", "1080")
+    qd = exportar.QUALITIES.get(q, exportar.QUALITIES["1080"])
+    audio = [(sess["path"], float(body.get("orig_gain", 1.0)))]
+    rj = jobs.get(body.get("rhythm_job") or "")
+    if body.get("include_rhythm") and rj and (rj.get("files") or {}).get("wav"):
+        audio.append((rj["files"]["wav"], float(body.get("rhythm_gain", 1.0))))
+    dst = _unique(os.path.join(folder, f"{name} - acordes backtrack ({qd['name']}).mp4"))
+    job = new_job(source=name, basename=os.path.splitext(os.path.basename(dst))[0])
+    job["input"] = sess["path"]
+
+    def progress(p, msg):
+        job["progress"], job["message"] = round(float(p), 1), msg
+
+    def work():
+        try:
+            job["status"] = "running"
+            with work_lock:
+                exportar.render_video(data, audio, dst, progress, quality=q)
+            job["files"] = {"mp4": dst}
+            job["notes"] = []
+            mb = os.path.getsize(dst) / 1e6
+            job["info"] = {"saved": dst, "mb": round(mb, 1), "quality": qd["name"],
+                           "whatsapp_ok": mb < 16 if q == "whatsapp" else None}
+            job["status"] = "done"
+            save_config(last_folder=folder)
+            progress(100, "¡Vídeo listo!")
         except Exception as e:
             traceback.print_exc()
             job["status"], job["message"] = "error", str(e)

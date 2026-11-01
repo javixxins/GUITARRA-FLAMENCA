@@ -78,6 +78,12 @@ def test_wav():
     return buf
 
 
+def g_voicings(cr, vo):
+    """Posturas alineadas con todos los segmentos (los «sin acorde» no llevan)."""
+    it = iter(vo["voicings"])
+    return [None if x["label"] == "N" else next(it, None) for x in cr["segments"]]
+
+
 def cfg_ids(cfg):
     return {x["id"] for x in cfg["sounds"]}
 
@@ -175,6 +181,23 @@ def main():
     while (rjo := c.get(f"/api/job/{ro['id']}").get_json())["status"] not in ("done", "error"):
         time.sleep(0.3)
     check(rjo["status"] == "done", f"guitarra rítmica copiando el ritmo del original ({rjo.get('info', {}).get('n_notes')} notas)")
+
+    print("3c. Exportar acordes (PDF y vídeo backtrack)")
+    exp_dir = os.path.join(TMP, "exportes con espacios")
+    edata = {"title": "Prueba", "key_name": cr["key"]["name"], "tempo": cr["tempo"], "meter": cr["meter"],
+             "capo": vo["capo"], "flats": cr["key"]["flats"], "notation": "es", "duration": cr["duration"],
+             "segments": cr["segments"], "voicings": g_voicings(cr, vo), "beats": cr["beats"], "downbeats": cr["downbeats"]}
+    r = c.post("/api/chords/export", json={"kind": "pdf", "folder": exp_dir, "name": "Prueba", "data": edata}).get_json()
+    check("saved" in r and open(r["saved"], "rb").read(5) == b"%PDF-", f"PDF: {os.path.basename(r.get('saved', '?'))}")
+    for q in ("720", "whatsapp"):
+        t0 = time.time()
+        r = c.post("/api/chords/export", json={"kind": "video", "sid": pid, "folder": exp_dir, "name": "Prueba",
+                                               "data": edata, "quality": q, "include_rhythm": True,
+                                               "rhythm_job": ro["id"]}).get_json()
+        while (vj := c.get(f"/api/job/{r['id']}").get_json())["status"] not in ("done", "error"):
+            time.sleep(0.3)
+        ok = vj["status"] == "done" and os.path.getsize(vj["info"]["saved"]) > 20000
+        check(ok, f"vídeo {vj.get('info', {}).get('quality', q)}: {vj.get('info', {}).get('mb')} MB en {time.time() - t0:.1f} s ({vj.get('message')})")
 
     print("4. Conversión (reutiliza el análisis de la preescucha)")
     t0 = time.time()

@@ -12,3 +12,5 @@ soundfile>=0.12
 flask>=3.0
 pillow>=10.0
 setuptools<81               # resampy necesita pkg_resources
+imageio-ffmpeg>=0.5             # video (trae ffmpeg para Windows y Mac)
+reportlab>=4.0                  # PDF de acordes

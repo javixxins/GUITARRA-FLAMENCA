@@ -21,7 +21,11 @@ sin subir nada a Internet.
   - crea una pista de guitarra flamenca rítmica que toca esos acordes **copiando el ritmo del
     original**: los mismos golpes, acentos, apagados, pulgar y punteos. También puede usar un
     patrón de rasgueo (rumba, tangos, sevillanas, bulerías, soleá…);
-  - la pista se exporta en WAV y MIDI y entra en el mezclador.
+  - la pista se exporta en WAV y MIDI y entra en el mezclador;
+  - **vídeo backtrack** horizontal con los acordes en pantalla sincronizados con el audio
+    original. Hay tres calidades: Full HD 1080p, HD 720p, u optimizado para WhatsApp (menos de 16 MB);
+  - **PDF horizontal** con los diagramas y los acordes compás a compás, para imprimir.
+  - En las dos exportaciones eliges la carpeta donde guardarlas.
 - **Mis ajustes**: guarda toda la configuración con un nombre y vuelve a elegirla cuando quieras.
 - **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
   plugin y aplica el que más se le parece, explicando por qué. Luego puedes retocarlo.
@@ -180,6 +184,29 @@ o palmas; mir_eval de ataques con margen de 50 ms.
 - **Comprobación**: el 97-99,6 % de las notas generadas pertenecen al acorde que suena en ese
   momento. El resto son anticipaciones de menos de 60 ms al acorde siguiente.
 
+### Exportar para aprender (`exportar.py`)
+- **Vídeo backtrack** (MP4 H.264 + AAC, horizontal 16:9). En pantalla aparecen:
+  - el acorde actual en grande con su diagrama y su forma con cejilla;
+  - el siguiente acorde con una cuenta atrás;
+  - los pulsos del compás y el número de compás;
+  - la línea de tiempo desplazándose y el progreso.
+
+  El audio es el original y, si quieres, también la guitarra rítmica. Calidades:
+
+  | Calidad | Resolución | Codificación |
+  |---|---|---|
+  | Full HD | 1920×1080 | CRF 18 |
+  | HD | 1280×720 | CRF 21 |
+  | WhatsApp | 960×540 | H.264 *main*, AAC 96k, peso calculado para quedar por debajo de 16 MB (4 minutos ≈ 10 MB) |
+
+  ffmpeg viene incluido con `imageio-ffmpeg`, en Windows y en Mac.
+- **PDF** (A4 horizontal, con reportlab):
+  - cabecera con la tonalidad, el tempo, el compás y la cejilla;
+  - diagramas de todos los acordes de la canción;
+  - partitura de acordes compás a compás, con tiempos. Si un acorde sigue sonando del compás
+    anterior, aparece entre paréntesis.
+- La tipografía DejaVu (licencia libre, en `fuentes/`) va con la app.
+
 ### Reverb y ecualizador
 - **Reverb** de sala por convolución:
   - reflexiones tempranas con anchura estéreo y una cola difusa;
@@ -247,6 +274,7 @@ La conversión final reutiliza ese análisis y tarda la mitad.
 | `acordes.py` | detección de acordes, tonalidad, tempo y compás |
 | `guitarra_ritmica.py` | posturas flamencas, cejilla, conducción de voces y rasgueos |
 | `ritmo_original.py` | golpes, acentos y técnica del original para copiar su ritmo |
+| `exportar.py` | vídeo backtrack y PDF de acordes |
 | `index.html` | la interfaz |
 | `instalar.*`, `Iniciar…`, `Parar…` | instalar, abrir y cerrar (`.bat` en Windows, `.command` en Mac) |
 | `make_icon.py` | dibuja el icono |

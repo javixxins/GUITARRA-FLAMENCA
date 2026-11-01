@@ -149,6 +149,10 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 .rhres{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 @media (max-width:860px){.chnow{grid-template-columns:1fr 1fr}.chtrans{grid-column:1 / -1}}
 @media (max-width:560px){.chnow{grid-template-columns:1fr}.chbox .nm{font-size:36px}}
+.expbox{margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.expbox h3{font-family:Fraunces,Georgia,serif;font-size:16px;margin:0 0 4px}
+.expbox .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.expbox select{width:auto}
 /* ---- mis ajustes */
 .mypre{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:16px}
 .mypre b{font-size:14px;margin-right:2px}
@@ -322,6 +326,26 @@ body.haslive main{padding-bottom:150px}
       <div class="tllegend" id="chLegend"></div>
       <div class="hint">Pulsa la línea de tiempo para ir a ese momento, o un acorde para corregirlo. Las rayas indican acordes menos seguros. Las marcas de abajo son los golpes del original (altura = acento).</div>
       <div class="chedit" id="chEdit" hidden></div>
+
+      <div class="expbox">
+        <h3>Exportar para aprender la canción</h3>
+        <div class="muted" style="font-size:13px">Vídeo horizontal con los acordes en pantalla sincronizados con el audio original, y PDF horizontal con los diagramas y los acordes compás a compás. Eliges la carpeta donde guardarlos.</div>
+        <div class="row">
+          <button class="btn primary" id="vidBtn">🎬 Exportar vídeo backtrack</button>
+          <label class="muted" style="font-size:13px">Calidad
+            <select id="vidQ"><option value="1080">Full HD 1080p (máxima calidad)</option><option value="720">HD 720p (más rápido y ligero)</option><option value="whatsapp">Optimizado para WhatsApp (menos de 16 MB)</option></select></label>
+          <label class="chk"><input type="checkbox" id="vidRh" disabled> Incluir la guitarra rítmica en el audio</label>
+        </div>
+        <div class="row">
+          <button class="btn" id="pdfBtn">📄 Exportar acordes en PDF</button>
+          <span class="muted" style="font-size:13px">A4 horizontal, listo para imprimir.</span>
+        </div>
+        <div id="expProgBox" style="display:none">
+          <div class="bar" style="height:10px"><div id="expBar"></div></div>
+          <div class="status"><span id="expMsg"></span><span class="pct" id="expPct"></span></div>
+        </div>
+        <div class="row" id="expRes"></div>
+      </div>
 
       <details open style="margin-top:14px">
         <summary>Rasgueo de la guitarra rítmica</summary>
@@ -1250,7 +1274,7 @@ $('rhBtn').onclick = async ()=>{
   set(100, '¡Guitarra rítmica lista!');
   CH.rjob = j; j.rhythm = true;
   const buf = await fetch(`/api/job/${j.id}/wav?t=${Date.now()}`).then(r=>r.arrayBuffer());
-  CH.rbuf = await lvCtx().decodeAudioData(buf); $('chVr').disabled = false;
+  CH.rbuf = await lvCtx().decodeAudioData(buf); $('chVr').disabled = false; $('vidRh').disabled = false; $('vidRh').checked = true;
   $('rhHint').textContent = 'Pulsa ▶ arriba para oírla junto al original, sincronizada con los acordes.';
   const i = j.info, base = '/api/job/'+j.id+'/';
   $('rhRes').innerHTML = `<span class="chip">${i.pattern}</span><span class="chip">${i.capo?'Cejilla traste '+i.capo:'Sin cejilla'}</span><span class="chip">${i.n_notes} notas</span>
@@ -1268,6 +1292,57 @@ $('rhBtn').onclick = async ()=>{
   };
   if(MX.versions.length && !MX.tracks.some(t=>t.v && t.v.id===j.id)) addTrack({id:j.id, rhythm:true, sound:j.sound, info:j.info}, 'wav', 0.8);
   if(CH.playing){ const t = chPos(); chPause(); CH.off = t; chPlay(); }
+};
+
+// ---------- exportar vídeo backtrack y PDF de acordes
+function expData(){
+  return {title: file ? file.name.replace(/\.wav$/i,'') : 'Acordes', key_name: CH.res.key.name, tempo: chTempo(), meter: CH.meter,
+    capo: CH.capo, flats: CH.flats, notation: CH.notation, duration: CH.res.duration,
+    segments: CH.segs.map(x=>({start:x.start, end:x.end, label:x.label, root:x.root, quality:x.quality})),
+    voicings: CH.voic, beats: CH.beats, downbeats: chDownbeats()};
+}
+async function expFolder(){
+  const r = await fetch('/api/choose-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).catch(()=>({}));
+  if(r.folder){ $('folder').value = r.folder; return r.folder; }
+  return null;
+}
+function expShow(path, extra){
+  const nm = path.split(/[\\/]/).pop();
+  $('expRes').innerHTML = `<span style="color:var(--ok)">✓ Guardado: <b>${nm.replace(/</g,'&lt;')}</b></span>${extra||''} <button class="btn small" id="expOpen">Mostrar en la carpeta</button>`;
+  $('expOpen').onclick = ()=>fetch('/api/open-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});
+}
+$('pdfBtn').onclick = async ()=>{
+  if(!CH.res) return;
+  $('expRes').textContent = 'Elige la carpeta en la ventana que se ha abierto…';
+  const folder = await expFolder(); if(!folder){ $('expRes').textContent = ''; return; }
+  const r = await fetch('/api/chords/export',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({kind:'pdf', folder, name: expData().title, data: expData()})}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ $('expRes').textContent = r.error; return; }
+  expShow(r.saved);
+};
+$('vidBtn').onclick = async ()=>{
+  if(!CH.res) return;
+  $('expRes').textContent = 'Elige la carpeta en la ventana que se ha abierto…';
+  const folder = await expFolder(); if(!folder){ $('expRes').textContent = ''; return; }
+  $('expRes').textContent = ''; $('vidBtn').disabled = true; $('expProgBox').style.display = 'block';
+  const set = (p,m)=>{ $('expBar').style.width = p+'%'; $('expPct').textContent = Math.round(p)+' %'; $('expMsg').textContent = m; };
+  set(0, 'Preparando el vídeo…');
+  const body = {kind:'video', sid: CH.sid, folder, name: expData().title, data: expData(), quality: $('vidQ').value,
+    include_rhythm: $('vidRh').checked, rhythm_job: CH.rjob ? CH.rjob.id : null, orig_gain: +$('chVo').value, rhythm_gain: +$('chVr').value};
+  const r = await fetch('/api/chords/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ set(0, r.error); $('vidBtn').disabled = false; return; }
+  let j;
+  while(true){
+    await new Promise(r=>setTimeout(r,700));
+    j = await fetch('/api/job/'+r.id).then(r=>r.json()).catch(()=>({}));
+    if(j.status==='done' || j.status==='error') break;
+    set(j.progress||0, j.message||'Creando el vídeo…');
+  }
+  $('vidBtn').disabled = false;
+  if(j.status!=='done'){ set(0, j.message||'No he podido crear el vídeo.'); return; }
+  set(100, '¡Vídeo listo!');
+  const i = j.info, wa = i.whatsapp_ok===true ? ' · listo para WhatsApp' : i.whatsapp_ok===false ? ' · pesa más de 16 MB: WhatsApp lo enviará como documento' : '';
+  expShow(i.saved, ` <span class="muted">(${i.quality}, ${String(i.mb).replace('.',',')} MB${wa})</span>`);
 };
 
 function init(cfg){
