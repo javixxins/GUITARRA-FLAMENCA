@@ -27,6 +27,8 @@ from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 import engine
 import instrument
 import recomendar
+import acordes
+import guitarra_ritmica
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(HERE, "trabajos")
@@ -490,6 +492,138 @@ def api_preview_recommend(sid):
             rec["status"], rec["message"] = "error", f"No he podido calcular el ajuste: {e}"
     threading.Thread(target=work, daemon=True).start()
     return jsonify({"ok": True})
+
+
+# ------------------------------------------------------------------ acordes y guitarra rítmica
+
+def _any_prep(sess):
+    """El análisis ya hecho del archivo (con o sin percusión, el que haya)."""
+    for rp in (True, False):
+        if rp in sess["preps"]:
+            return rp, sess["preps"][rp]
+    return None, None
+
+
+@app.route("/api/preview/<sid>/chords", methods=["POST", "GET"])
+def api_chords(sid):
+    """Detecta los acordes del archivo (línea de tiempo, tonalidad, tempo y compás)."""
+    sess = previews.get(sid)
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    if request.method == "GET":
+        return jsonify(sess.get("chords") or {"status": "none"})
+    rp, prep = _any_prep(sess)
+    if prep is None:
+        return jsonify({"error": "Espera a que termine de prepararse el archivo."}), 409
+    cur = sess.get("chords") or {}
+    if cur.get("status") == "running":
+        return jsonify({"ok": True})
+    st = {"status": "running", "progress": 0, "message": "Empezando…"}
+    sess["chords"] = st
+
+    def progress(p, msg):
+        st["progress"], st["message"] = round(float(p), 1), msg
+
+    def work():
+        try:
+            st["result"] = acordes.detect(sess["path"], prep, progress)
+            st["status"] = "done"
+        except Exception as e:
+            traceback.print_exc()
+            st["status"], st["message"] = "error", f"No he podido detectar los acordes: {e}"
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/chords/patterns")
+def api_chord_patterns():
+    return jsonify({"patterns": [{"id": k, "name": v["name"], "meter": v["meter"]}
+                                 for k, v in guitarra_ritmica.PATTERNS.items()]})
+
+
+@app.route("/api/chords/voicings", methods=["POST"])
+def api_chord_voicings():
+    """Posturas de guitarra para una secuencia de acordes (cejilla y conducción de voces)."""
+    data = request.json or {}
+    labels = data.get("labels", [])
+    durs = data.get("durs") or [1.0] * len(labels)
+    flavor = data.get("flavor", "flamenco")
+    try:
+        capo = guitarra_ritmica.choose_capo([(l, d) for l, d in zip(labels, durs) if l and l != "N"],
+                                            data.get("capo", "auto"), flavor)
+        vo = guitarra_ritmica.voice_lead(labels, capo, flavor)
+    except Exception as e:
+        return jsonify({"error": f"Acorde no válido: {e}"}), 400
+    return jsonify({"capo": capo, "voicings": vo})
+
+
+@app.route("/api/chords/render", methods=["POST"])
+def api_chords_render():
+    """Genera la pista de guitarra rítmica (WAV + MIDI) con los acordes y el rasgueo elegidos."""
+    data = request.json or {}
+    sess = previews.get(data.get("sid", ""))
+    if not sess:
+        return jsonify({"error": "La preescucha ha caducado; vuelve a elegir el archivo."}), 404
+    segs = data.get("segments") or []
+    if not any(s.get("label") not in (None, "N") for s in segs):
+        return jsonify({"error": "No hay acordes que tocar."}), 400
+    inst = get_instrument()
+    if inst is None:
+        return jsonify({"error": "Falta el plugin de guitarra."}), 503
+    rh = data.get("rhythm", {})
+    opts = data.get("options", {})
+    pat = guitarra_ritmica.PATTERNS.get(rh.get("pattern"), guitarra_ritmica.PATTERNS["rumba"])
+    src = safe_name(data.get("name") or "audio")
+    job = new_job(source=src, basename=f"{src} - guitarra rítmica ({pat['name'].split(' (')[0]})")
+    job["input"] = sess["path"]
+    job["rhythm"] = True
+
+    def progress(p, msg):
+        job["progress"], job["message"] = round(float(p), 1), msg
+
+    def work():
+        try:
+            job["status"] = "running"
+            progress(3, "Eligiendo las posturas de guitarra…")
+            labels = [s.get("label") or "N" for s in segs]
+            durs = [float(s["end"]) - float(s["start"]) for s in segs]
+            flavor = rh.get("flavor", "flamenco")
+            capo = guitarra_ritmica.choose_capo([(l, d) for l, d in zip(labels, durs) if l != "N"],
+                                                rh.get("capo", "auto"), flavor)
+            vo = guitarra_ritmica.voice_lead(labels, capo, flavor)
+            progress(8, "Colocando el rasgueo sobre el pulso del original…")
+            notes = guitarra_ritmica.generate(segs, vo, data.get("beats") or [], data.get("downbeats") or [], rh)
+            if not notes:
+                raise ValueError("No ha salido ninguna nota: revisa los acordes.")
+            dyn = float(rh.get("dyn", 0.4))
+            rp, _ = _any_prep(sess)
+            ropts = dict(opts, strum=0, tremolo="off", guitar_register=False, follow_bends=False, transpose=0,
+                         copy_timbre=0, follow_dynamics=dyn, tuning_cents=float(data.get("tuning_cents", 0)),
+                         follow_tuning=True)
+            if dyn > 0 and rp is not None and sess["refs"].get(rp) is not None:
+                ropts["ref_audio"] = sess["refs"][rp]
+            sid_sound = opts.get("sound", "estudio")
+            with work_lock:
+                audio = engine.render(notes, sid_sound if sid_sound in instrument.SOUNDS else "estudio",
+                                      inst, ropts, lambda p, m: progress(10 + 0.85 * (p - 55) / 0.45 if p > 55 else 10, m))
+                progress(96, "Guardando WAV y MIDI…")
+                wav = os.path.join(job["dir"], f"{job['basename']}.wav")
+                mid = os.path.join(job["dir"], f"{job['basename']}.mid")
+                engine.write_wav(audio, wav, bits=int(opts.get("bits", 24)))
+                tempo = float(data.get("tempo") or 100)
+                engine.write_midi(notes, mid, tempo, "Guitarra rítmica flamenca")
+            job["files"] = {"wav": wav, "mid": mid}
+            job["notes"] = []
+            job["info"] = {"n_notes": len(notes), "capo": capo, "pattern": pat["name"],
+                           "duration": round(len(audio) / instrument.SR, 2)}
+            job["sound"] = sid_sound
+            job["status"] = "done"
+            progress(100, "¡Guitarra rítmica lista!")
+        except Exception as e:
+            traceback.print_exc()
+            job["status"], job["message"] = "error", str(e)
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify({"id": job["id"]})
 
 
 @app.route("/api/rerender", methods=["POST"])

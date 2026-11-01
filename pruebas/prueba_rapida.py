@@ -140,6 +140,33 @@ def main():
     check(res["after"]["total"] >= res["before"]["total"] - 1e-9,
           f"parecido {res['before']['total']:.3f} → {res['after']['total']:.3f} (no empeora)")
 
+    print("3b. Acordes y guitarra rítmica")
+    t0 = time.time()
+    c.post(f"/api/preview/{pid}/chords")
+    while (ch := c.get(f"/api/preview/{pid}/chords").get_json())["status"] == "running":
+        time.sleep(0.3)
+    check(ch["status"] == "done", f"acordes detectados en {time.time() - t0:.1f} s")
+    cr = ch["result"]
+    labels = [x["label"] for x in cr["segments"] if x["label"] != "N"]
+    want = ["A:min", "G:maj", "F:maj", "E:maj"]
+    found = [w for w in want if w in labels]
+    print(f"     {' '.join(labels)} · {cr['key']['name']} · {cr['tempo']:.0f} BPM")
+    check(len(found) >= 3, f"reconoce {len(found)}/4 acordes de la cadencia andaluza")
+    vo = c.post("/api/chords/voicings", json={"labels": labels, "capo": "auto"}).get_json()
+    check(len(vo["voicings"]) == len(labels) and all(v and len(v["frets"]) == 6 for v in vo["voicings"]),
+          f"posturas de guitarra (cejilla {vo['capo']}): " + ", ".join(v["name"] for v in vo["voicings"][:4]))
+    t0 = time.time()
+    rj = c.post("/api/chords/render", json={"sid": pid, "segments": cr["segments"], "beats": cr["beats"],
+                                           "downbeats": cr["downbeats"], "tempo": cr["tempo"], "name": "prueba",
+                                           "tuning_cents": cr["tuning_cents"], "rhythm": {"pattern": "rumba"},
+                                           "options": {"sound": "estudio"}}).get_json()
+    while (rjob := c.get(f"/api/job/{rj['id']}").get_json())["status"] not in ("done", "error"):
+        time.sleep(0.3)
+    check(rjob["status"] == "done", f"guitarra rítmica generada en {time.time() - t0:.1f} s ({rjob['info']['n_notes']} notas)")
+    ra, rsr = sf.read(io.BytesIO(c.get(f"/api/job/{rj['id']}/wav").data))
+    check(ra.ndim == 2 and len(ra) / rsr > 4 and np.isfinite(ra).all() and np.abs(ra).max() > 0.05, f"WAV de {len(ra) / rsr:.1f} s")
+    check(c.get(f"/api/job/{rj['id']}/mid").data[:4] == b"MThd", "MIDI de la guitarra rítmica")
+
     print("4. Conversión (reutiliza el análisis de la preescucha)")
     t0 = time.time()
     r = c.post("/api/convert", data={"file": (test_wav(), "prueba acordes.wav"), "preview_id": pid,
@@ -169,7 +196,8 @@ def main():
 
     print("6. Mezclador")
     mx = c.post("/api/mix", json={"tracks": [{"job": jid, "kind": "wav", "gain": 1},
-                                             {"job": jid, "kind": "original", "gain": 0.3}]}).get_json()
+                                             {"job": jid, "kind": "original", "gain": 0.3},
+                                             {"job": rj["id"], "kind": "wav", "gain": 0.8}]}).get_json()
     check("id" in mx, f"mezcla de {mx.get('duration')} s")
 
     print("7. Guardar")
@@ -178,6 +206,9 @@ def main():
                                   "formats": ["wav", "mid", "mix"], "mix_id": mx["id"]}).get_json()
     files = sorted(os.listdir(out)) if os.path.isdir(out) else []
     check(len(files) == 3, f"guardados: {files}")
+    s2 = c.post("/api/save", json={"id": rj["id"], "folder": out, "name": "Prueba rítmica",
+                                   "formats": ["wav", "mid"]}).get_json()
+    check(len(s2.get("saved", [])) == 2, "guitarra rítmica guardada (WAV + MIDI)")
 
     print("\nTODO CORRECTO ✅")
 

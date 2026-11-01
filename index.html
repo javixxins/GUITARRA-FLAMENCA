@@ -106,6 +106,46 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 @media (max-width:760px){.track{grid-template-columns:14px 1fr auto auto}.track .vol,.track .pan{grid-column:2 / -1}.masterrow{grid-template-columns:1fr}}
 @media (max-width:640px){.player{grid-template-columns:1fr}.save{grid-template-columns:1fr}.mix.show{grid-template-columns:1fr}.hero{min-height:150px}}
 
+/* ---- acordes y guitarra rítmica */
+.chtop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chtop .chip b{color:var(--gold2)}
+.chtop select{width:auto;padding:3px 8px;font-size:13px}
+.mini{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:2px 8px;font:inherit;font-size:12px;cursor:pointer}
+.mini:hover{border-color:var(--gold)}
+.chnow{display:grid;grid-template-columns:1.2fr 1fr 1.3fr;gap:14px;align-items:stretch}
+.chbox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center;min-height:150px}
+.chbox .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chbox .nm{font-family:Fraunces,Georgia,serif;font-size:44px;line-height:1.05;color:var(--gold2)}
+.chbox .nm.sm{font-size:28px;color:var(--text)}
+.chbox .sub{font-size:13px;color:var(--muted)}
+.chbox svg{flex:none}
+.chtrans{flex-direction:column;align-items:stretch;justify-content:center;gap:8px}
+.chtrans .row{display:flex;align-items:center;gap:10px}
+.chtrans .row label{font-size:13px;color:var(--muted);width:120px}
+.chtrans .row input{flex:1}
+.chplay{width:46px;height:46px;border-radius:50%;border:0;background:var(--gold);color:#1a120c;font-size:20px;cursor:pointer;flex:none}
+.chplay:disabled{opacity:.4}
+.tl{position:relative;overflow-x:auto;overflow-y:hidden;margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#0d0907;height:96px;cursor:pointer}
+.tlin{position:relative;height:100%}
+.tlb{position:absolute;top:22px;height:62px;border-radius:7px;padding:4px 6px;box-sizing:border-box;overflow:hidden;white-space:nowrap;
+  font-weight:600;font-size:15px;color:#1a120c;border:1px solid rgba(0,0,0,.35);transition:filter .1s}
+.tlb small{display:block;font-weight:500;font-size:11px;opacity:.75}
+.tlb.low{background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.0) 0 6px,rgba(0,0,0,.12) 6px 12px)}
+.tlb.now{outline:3px solid #fff;outline-offset:-1px;filter:brightness(1.12)}
+.tlb.nc{background:#2a211b!important;color:var(--muted)}
+.tlbar{position:absolute;top:0;bottom:0;width:1px;background:rgba(232,184,120,.45)}
+.tlbar span{position:absolute;top:3px;left:3px;font-size:10px;color:var(--muted)}
+.tlbeat{position:absolute;top:14px;height:6px;width:1px;background:rgba(232,184,120,.25)}
+.tlhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 8px #fff;pointer-events:none}
+.chedit{margin-top:10px;background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:12px}
+.chedit .alts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chedit .alts button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:14px}
+.chedit .alts button:hover{border-color:var(--gold)}
+.chedit .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chedit select{width:auto}
+.rhres{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (max-width:860px){.chnow{grid-template-columns:1fr 1fr}.chtrans{grid-column:1 / -1}}
+@media (max-width:560px){.chnow{grid-template-columns:1fr}.chbox .nm{font-size:36px}}
 /* ---- mis ajustes */
 .mypre{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:16px}
 .mypre b{font-size:14px;margin-right:2px}
@@ -254,6 +294,44 @@ body.haslive main{padding-bottom:150px}
     <div id="progBox" style="display:none">
       <div class="bar"><div id="bar"></div></div>
       <div class="status"><span id="msg"></span><span class="pct" id="pct">0 %</span></div>
+    </div>
+  </section>
+
+  <section class="card" id="chordSec" hidden>
+    <div class="step"><b>♪</b><h2>Acordes y guitarra rítmica</h2></div>
+    <div class="hint" style="margin-top:-6px">La app detecta los acordes de tu archivo, su tonalidad, tempo y compás, y crea una pista de guitarra flamenca rítmica que toca esos acordes con el rasgueo que elijas, sobre el mismo pulso que el original. Puedes mezclarla con el resultado.</div>
+    <div id="chProg" style="margin-top:12px">
+      <div class="bar" style="height:8px;margin-top:0"><div id="chBar"></div></div>
+      <div class="status"><span id="chMsg">Esperando el archivo…</span></div>
+    </div>
+    <div id="chMain" hidden>
+      <div class="chtop" id="chTop"></div>
+      <div class="chnow">
+        <div class="chbox"><div><div class="lbl">Ahora</div><div class="nm" id="chCur">—</div><div class="sub" id="chCurSub"></div></div><div id="chCurDia"></div></div>
+        <div class="chbox"><div><div class="lbl">Siguiente</div><div class="nm sm" id="chNext">—</div><div class="sub" id="chNextSub"></div></div><div id="chNextDia"></div></div>
+        <div class="chbox chtrans">
+          <div class="row"><button class="chplay" id="chPlay" title="Reproducir">▶</button><span id="chTime" class="muted">0:00 / 0:00</span></div>
+          <div class="row"><label>Original <span id="chVoV"></span></label><input type="range" id="chVo" min="0" max="1.5" step="0.01" value="1"></div>
+          <div class="row"><label>Guitarra rítmica <span id="chVrV"></span></label><input type="range" id="chVr" min="0" max="1.5" step="0.01" value="1" disabled></div>
+        </div>
+      </div>
+      <div class="tl" id="chTL"><div class="tlin" id="chTLin"></div></div>
+      <div class="hint">Pulsa la línea de tiempo para ir a ese momento, o un acorde para corregirlo. Las rayas indican acordes menos seguros.</div>
+      <div class="chedit" id="chEdit" hidden></div>
+
+      <details open style="margin-top:14px">
+        <summary>Rasgueo de la guitarra rítmica</summary>
+        <div class="grid" id="rhGrid"></div>
+      </details>
+      <div class="go" style="margin-top:14px">
+        <button class="btn primary big" id="rhBtn">🎸 Generar guitarra rítmica</button>
+        <span class="muted" id="rhHint">Usa el sonido, la reverb y el ecualizador elegidos arriba.</span>
+      </div>
+      <div id="rhProgBox" style="display:none">
+        <div class="bar"><div id="rhBar"></div></div>
+        <div class="status"><span id="rhMsg"></span><span class="pct" id="rhPct">0 %</span></div>
+      </div>
+      <div class="rhres" id="rhRes" hidden></div>
     </div>
   </section>
 
@@ -462,7 +540,7 @@ function pick(f){
   $('origPrev').onloadedmetadata = ()=>{ const d=$('origPrev').duration; $('fileMeta').textContent += ` · ${Math.floor(d/60)}:${String(Math.round(d%60)).padStart(2,'0')} min`; };
   $('goBtn').disabled = !CFG.plugin_ok; $('goHint').textContent = 'Suele tardar bastante menos de lo que dura el audio.';
   $('saveName').value = '';
-  if(CFG.plugin_ok){ recReset(); lvStart(f); }
+  if(CFG.plugin_ok){ recReset(); chReset(); lvStart(f); }
 }
 $('fileIn').onchange = e=>pick(e.target.files[0]);
 const drop = $('drop');
@@ -530,7 +608,7 @@ $('saveName').oninput = ()=>$('saveName').dataset.auto='0';
 
 // sólo suena un reproductor a la vez; la línea del piano roll sigue al que suena
 const players = ['aWav','aMid','aOrig','origPrev','aMix'];
-function stopAll(except){ if(except!=='live') lvPause(); players.forEach(id=>{ if(id!==except) $(id).pause(); }); if(except!=='mixer') mixPause(); if(except!=='demo'){ demoAudio.pause(); if(demoBtn){demoBtn.classList.remove('playing');demoBtn.textContent='▶ Escuchar ejemplo';} } }
+function stopAll(except){ if(except!=='live') lvPause(); if(except!=='chords' && typeof chPause==='function') chPause(); players.forEach(id=>{ if(id!==except) $(id).pause(); }); if(except!=='mixer') mixPause(); if(except!=='demo'){ demoAudio.pause(); if(demoBtn){demoBtn.classList.remove('playing');demoBtn.textContent='▶ Escuchar ejemplo';} } }
 players.forEach(id=>{ $(id).addEventListener('play', ()=>{ stopAll(id); tick(); }); });
 let raf = null;
 function tick(){
@@ -580,6 +658,7 @@ function mxCtx(){
 }
 function trackLabel(v, kind){
   const n = MX.versions.indexOf(v)+1, vv = MX.versions.length>1 ? ` · versión ${n}` : '';
+  if(v.rhythm) return ['Guitarra rítmica', 'Acordes detectados · '+(v.info&&v.info.pattern||'rasgueo')];
   if(kind==='original') return ['Original', 'La grabación que subiste'];
   if(kind==='midi_preview') return ['Notas MIDI', 'Sonido neutro de las notas'+vv];
   return ['Guitarra · '+soundName(v.sound), 'Guitarra flamenca convertida'+vv];
@@ -609,6 +688,7 @@ function onVersion(v, mode){
   if(mode==='fresh' || !MX.versions.length){
     mixPause(); MX.offset = 0; MX.tracks.slice().forEach(t=>removeTrack(t, true)); MX.tracks = []; MX.versions = [v];
     addTrack(v, 'wav', 1); addTrack(v, 'original', 0.3);
+    if(typeof CH!=='undefined' && CH.rjob) addTrack({id:CH.rjob.id, rhythm:true, sound:CH.rjob.sound, info:CH.rjob.info}, 'wav', 0.8);
   } else {
     MX.versions.push(v);
     if(mode==='add') addTrack(v, 'wav', 0.8);
@@ -765,7 +845,7 @@ async function lvStart(f){
   LV.sid = r.id;
   while(file===f){
     const st = await fetch('/api/preview/'+LV.sid).then(r=>r.json()).catch(()=>({}));
-    if(st.status==='ready'){ LV.dur=st.duration; LV.len=Math.min(10, st.duration); lvRangeTxt(); LV.ready=true; recReady(); lvRequest(); return; }
+    if(st.status==='ready'){ LV.dur=st.duration; LV.len=Math.min(10, st.duration); lvRangeTxt(); LV.ready=true; recReady(); lvRequest(); chStart(); return; }
     if(st.status==='error' || st.error){ lvStat(st.message||st.error,'err'); return; }
     lvStat(`Preparando la preescucha… ${Math.round(st.progress||0)} % · ${st.message||''}`);
     $('lvBar').style.width=(st.progress||0)+'%';
@@ -951,6 +1031,235 @@ $('preDel').onclick = async ()=>{
   fillPresets(r.presets); preMsg(`Ajustes «${name}» borrados.`);
 };
 fetch('/api/presets').then(r=>r.json()).then(r=>fillPresets(r.presets)).catch(()=>{});
+
+// ---------- acordes y guitarra rítmica
+const CH = {sid:null, res:null, segs:[], beats:[], beats0:[], phase:0, meter:4, notation:'es', flats:false, voic:[], capo:0,
+            px:90, playing:false, t0:0, off:0, srcs:[], raf:null, rjob:null, rbuf:null, edit:-1, dirty:false};
+const NS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'], NF = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const ES = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'], EF = ['Do','Reb','Re','Mib','Mi','Fa','Solb','Sol','Lab','La','Sib','Si'];
+const QSUF = {maj:'', min:'m', '7':'7', maj7:'maj7', min7:'m7', dim:'dim', sus4:'sus4'};
+const QNAME = {maj:'mayor', min:'menor', '7':'séptima', maj7:'séptima mayor', min7:'menor séptima', dim:'disminuido', sus4:'suspendido 4ª'};
+const RH = [
+  {k:'pattern', l:'Patrón de rasgueo', type:'select', opts:[], v:'rumba'},
+  {k:'strum_ms', l:'Velocidad del rasgueo', min:4, max:40, step:1, v:14, f:v=>v+' ms entre cuerdas', s:'Menos = rasgueo más seco y rápido'},
+  {k:'intensity', l:'Intensidad', min:0, max:1, step:.05, v:.7, f:v=>Math.round(v*100)+' %'},
+  {k:'accent', l:'Acentos del compás', min:0, max:1, step:.05, v:.6, f:v=>Math.round(v*100)+' %', s:'Cuánto se marcan los golpes fuertes'},
+  {k:'humanize', l:'Humanizar', min:0, max:1, step:.05, v:.4, f:v=>Math.round(v*100)+' %', s:'Pequeñas variaciones de tiempo y fuerza, como una persona'},
+  {k:'swing', l:'Swing', min:0, max:1, step:.05, v:0, f:v=>Math.round(v*100)+' %'},
+  {k:'ring', l:'Dejar sonar las cuerdas', min:0, max:1, step:.05, v:.8, f:v=>Math.round(v*100)+' %', s:'Bajo = más apagado y percusivo'},
+  {k:'dyn', l:'Seguir la dinámica del original', min:0, max:1, step:.05, v:.4, f:v=>Math.round(v*100)+' %'},
+  {k:'flavor', l:'Posturas', type:'select', opts:[['flamenco','Flamencas (cuerdas al aire, color flamenco)'],['natural','Naturales (sólo notas del acorde)']], v:'flamenco'},
+  {k:'capo', l:'Cejilla', type:'select', opts:[['auto','Automática (como un guitarrista flamenco)'],['0','Sin cejilla'],['1','Traste 1'],['2','Traste 2'],['3','Traste 3'],['4','Traste 4'],['5','Traste 5'],['6','Traste 6'],['7','Traste 7']], v:'auto'},
+  {k:'hit_changes', l:'Golpe en cada cambio de acorde', type:'select', opts:[['1','Sí'],['0','No (sólo el patrón)']], v:'1'},
+];
+function chName(root, q, lang){ if(root==null) return lang==='es'?'Sin acorde':'N.C.'; const n = lang==='es' ? (CH.flats?EF:ES) : (CH.flats?NF:NS); return n[root]+QSUF[q]; }
+function chLabel(root, q){ return root==null ? 'N' : NS[root]+':'+q; }
+function chMsg(t, p){ $('chMsg').textContent = t; if(p!=null) $('chBar').style.width = p+'%'; }
+function rhParams(){ const o = {}; RH.forEach(d=>{ const el=$('rh_'+d.k); if(el) o[d.k] = d.type==='select' ? el.value : +el.value; });
+  o.hit_changes = o.hit_changes==='1'; return o; }
+function rhCtl(d){
+  const box = document.createElement('div'); box.className='ctl';
+  if(d.type==='select'){ box.innerHTML = `<label>${d.l}</label><select id="rh_${d.k}">${d.opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`; $('rhGrid').appendChild(box); $('rh_'+d.k).value = d.v; $('rh_'+d.k).onchange = ['flavor','capo'].includes(d.k) ? ()=>{ rhChanged(); chVoicings(); } : rhChanged; }
+  else { box.innerHTML = `<label>${d.l} <span id="rhv_${d.k}"></span></label><input type="range" id="rh_${d.k}" min="${d.min}" max="${d.max}" step="${d.step}" value="${d.v}">${d.s?`<small>${d.s}</small>`:''}`;
+    $('rhGrid').appendChild(box); const r=$('rh_'+d.k), u=()=>$('rhv_'+d.k).textContent=d.f(+r.value); u(); r.oninput=()=>{u(); rhChanged();}; }
+}
+function rhChanged(){ if(CH.rjob){ $('rhHint').textContent = 'Has cambiado el rasgueo o los acordes: vuelve a generar para oírlo.'; } }
+async function rhInit(){
+  const r = await fetch('/api/chords/patterns').then(r=>r.json()).catch(()=>({patterns:[]}));
+  RH[0].opts = r.patterns.map(p=>[p.id, p.name]); $('rhGrid').innerHTML=''; RH.forEach(rhCtl);
+}
+rhInit();
+
+function chReset(){ chPause(); CH.sid=null; CH.res=null; CH.rjob=null; CH.rbuf=null; CH.off=0; $('chordSec').hidden=false; $('chMain').hidden=true; $('chProg').hidden=false; chMsg('Preparando el archivo…', 0); }
+async function chStart(){
+  if(!LV.sid) return;
+  CH.sid = LV.sid; CH.res = null; CH.rjob = null; CH.rbuf = null; chPause(); CH.off = 0;
+  $('chordSec').hidden = false; $('chMain').hidden = true; $('chProg').hidden = false; $('rhRes').hidden = true;
+  chMsg('Detectando los acordes…', 2);
+  const r = await fetch(`/api/preview/${CH.sid}/chords`,{method:'POST'}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ chMsg(r.error); return; }
+  const sid = CH.sid;
+  while(CH.sid===sid){
+    await new Promise(r=>setTimeout(r,500));
+    const st = await fetch(`/api/preview/${sid}/chords`).then(r=>r.json()).catch(()=>({}));
+    if(CH.sid!==sid) return;
+    if(st.status==='running'){ chMsg(st.message||'Analizando…', st.progress||0); continue; }
+    if(st.status!=='done'){ chMsg(st.message||st.error||'No he podido detectar los acordes.'); return; }
+    CH.res = st.result; CH.flats = st.result.key.flats; CH.beats0 = st.result.beats.slice(); CH.beats = st.result.beats.slice();
+    CH.meter = st.result.meter; CH.phase = Math.max(0, CH.beats.findIndex(b=>Math.abs(b-st.result.downbeats[0])<1e-3));
+    CH.segs = st.result.segments.map(x=>Object.assign({}, x));
+    $('chProg').hidden = true; $('chMain').hidden = false;
+    await chVoicings(); chTop(); chTimeline(); chUpdate(0);
+    return;
+  }
+}
+function chDownbeats(){ const out=[]; for(let i=CH.phase % CH.meter; i<CH.beats.length; i+=CH.meter) out.push(CH.beats[i]); return out; }
+function chTempo(){ const d=[]; for(let i=1;i<CH.beats.length;i++) d.push(CH.beats[i]-CH.beats[i-1]); d.sort((a,b)=>a-b); return d.length ? 60/d[Math.floor(d.length/2)] : 0; }
+function chTop(){
+  const r = CH.res, conf = Math.round(r.reliability*100);
+  $('chTop').innerHTML =
+    `<span class="chip">Tonalidad: <b>${r.key.name}</b> <span class="muted">(${r.key.en})</span></span>`+
+    `<span class="chip">Tempo: <b>${Math.round(chTempo())} BPM</b> <button class="mini" id="chHalf" title="Si el pulso va el doble de rápido">×½</button> <button class="mini" id="chDbl" title="Si el pulso va a la mitad">×2</button></span>`+
+    `<span class="chip">Compás: <select id="chMeter"><option value="4">4 tiempos</option><option value="3">3 tiempos</option><option value="12">12 (flamenco)</option></select></span>`+
+    `<span class="chip">Fiabilidad media: <b>${conf} %</b></span>`+
+    `<span class="chip">Cejilla: <b id="chCapo">${CH.capo ? 'traste '+CH.capo : 'sin cejilla'}</b></span>`+
+    `<span class="chip">Nombres: <select id="chNot"><option value="es">Do Re Mi</option><option value="en">C D E</option></select></span>`+
+    `<button class="mini" id="chTxt" title="Descargar la lista de acordes">⬇ Acordes (.txt)</button>`;
+  $('chMeter').value = String(CH.meter); $('chNot').value = CH.notation;
+  $('chMeter').onchange = ()=>{ CH.meter = +$('chMeter').value; chTimeline(); rhChanged(); };
+  $('chNot').onchange = ()=>{ CH.notation = $('chNot').value; chTimeline(); chUpdate(chPos()); };
+  $('chHalf').onclick = ()=>{ if(CH.beats.length<4) return; CH.beats = CH.beats.filter((_,i)=>i%2===0); CH.phase = Math.floor(CH.phase/2); chTop(); chTimeline(); rhChanged(); };
+  $('chDbl').onclick = ()=>{ const b=[]; for(let i=0;i<CH.beats.length;i++){ b.push(CH.beats[i]); if(i+1<CH.beats.length) b.push((CH.beats[i]+CH.beats[i+1])/2); } CH.beats=b; CH.phase*=2; chTop(); chTimeline(); rhChanged(); };
+  $('chTxt').onclick = chDownloadTxt;
+}
+async function chVoicings(){
+  const labels = CH.segs.map(x=>x.label), durs = CH.segs.map(x=>x.end-x.start);
+  const p = rhParams();
+  const r = await fetch('/api/chords/voicings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({labels, durs, capo:p.capo, flavor:p.flavor})}).then(r=>r.json()).catch(()=>({}));
+  if(r.voicings){ CH.voic = r.voicings; CH.capo = r.capo; if($('chCapo')) $('chCapo').textContent = CH.capo ? 'traste '+CH.capo : 'sin cejilla'; chUpdate(chPos(), true); }
+}
+function chColor(root, q){ if(root==null) return '#2a211b'; const h = (root*30+20)%360; const l = q==='min'||q==='min7' ? 58 : q==='dim' ? 50 : 66; return `hsl(${h} 55% ${l}%)`; }
+function chTimeline(){
+  const dur = CH.res.duration, W = Math.max(dur*CH.px, $('chTL').clientWidth);
+  const inn = $('chTLin'); inn.style.width = W+'px';
+  let h = '';
+  CH.beats.forEach(b=>{ h += `<div class="tlbeat" style="left:${b*CH.px}px"></div>`; });
+  chDownbeats().forEach((b,i)=>{ h += `<div class="tlbar" style="left:${b*CH.px}px"><span>${i+1}</span></div>`; });
+  CH.segs.forEach((x,i)=>{
+    const w = Math.max(2,(x.end-x.start)*CH.px-2);
+    h += `<div class="tlb ${x.root==null?'nc':''} ${x.conf<0.55?'low':''}" data-i="${i}" style="left:${x.start*CH.px+1}px;width:${w}px;background:${chColor(x.root,x.quality)}" title="${chName(x.root,x.quality,'es')} (${chName(x.root,x.quality,'en')}) · ${Math.round(x.conf*100)} % seguro">${x.root==null?'—':chName(x.root,x.quality,CH.notation)}<small>${x.root==null?'':Math.round(x.conf*100)+' %'}</small></div>`;
+  });
+  h += `<div class="tlhead" id="chHead" style="left:${CH.off*CH.px}px"></div>`;
+  inn.innerHTML = h;
+  inn.querySelectorAll('.tlb').forEach(el=>el.onclick = e=>{ e.stopPropagation(); chEditOpen(+el.dataset.i); });
+  $('chTL').onclick = e=>{ const r = $('chTLin').getBoundingClientRect(); chSeek((e.clientX - r.left)/CH.px); };
+}
+function chSegAt(t){ for(let i=0;i<CH.segs.length;i++){ if(t>=CH.segs[i].start && t<CH.segs[i].end) return i; } return -1; }
+function diagram(v, size=1){
+  if(!v) return '';
+  const fr = v.frets, used = fr.filter(f=>f>0), maxf = used.length?Math.max(...used):0, minf = used.length?Math.min(...used):0;
+  const base = maxf>4 ? minf : 1, W=96*size, H=118*size, x0=14*size, y0=24*size, sx=13.5*size, sy=18*size;
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-label="Diagrama de guitarra">`;
+  for(let i=0;i<6;i++) s += `<line x1="${x0+i*sx}" y1="${y0}" x2="${x0+i*sx}" y2="${y0+5*sy}" stroke="#b9a690" stroke-width="${i<3?1.6:1}"/>`;
+  for(let j=0;j<=5;j++) s += `<line x1="${x0}" y1="${y0+j*sy}" x2="${x0+5*sx}" y2="${y0+j*sy}" stroke="#7a6550" stroke-width="${j===0&&base===1?4:1}"/>`;
+  if(base>1) s += `<text x="${x0+5*sx+5}" y="${y0+sy*0.7}" font-size="${11*size}" fill="#b9a690">${base}</text>`;
+  fr.forEach((f,i)=>{ const x=x0+i*sx;
+    if(f<0) s += `<text x="${x}" y="${y0-7*size}" font-size="${11*size}" fill="#b9a690" text-anchor="middle">×</text>`;
+    else if(f===0) s += `<circle cx="${x}" cy="${y0-10*size}" r="${4*size}" fill="none" stroke="#e8b878" stroke-width="1.4"/>`;
+    else s += `<circle cx="${x}" cy="${y0+(f-base+0.5)*sy}" r="${5.2*size}" fill="#e8b878"/>`; });
+  if(v.capo) s += `<text x="${x0+2.5*sx}" y="${H-3*size}" font-size="${10*size}" fill="#e8b878" text-anchor="middle">cejilla ${v.capo}</text>`;
+  return s + '</svg>';
+}
+let chLastSeg = -2;
+function chUpdate(t, force){
+  const i = chSegAt(t);
+  if($('chHead')) $('chHead').style.left = (t*CH.px)+'px';
+  $('chTime').textContent = `${fmtT(t)} / ${fmtT(CH.res?CH.res.duration:0)}`;
+  if(i===chLastSeg && !force) return; chLastSeg = i;
+  document.querySelectorAll('.tlb.now').forEach(e=>e.classList.remove('now'));
+  const el = document.querySelector(`.tlb[data-i="${i}"]`); if(el) el.classList.add('now');
+  const x = CH.segs[i], nxtI = CH.segs.findIndex((s,k)=>k>i && s.root!=null), n = nxtI>=0 ? CH.segs[nxtI] : null;
+  $('chCur').textContent = x ? chName(x.root,x.quality,CH.notation) : '—';
+  $('chCurSub').textContent = x && x.root!=null ? `${chName(x.root,x.quality,CH.notation==='es'?'en':'es')} · ${QNAME[x.quality]}${CH.voic[i]?' · '+CH.voic[i].name:''}` : '';
+  $('chCurDia').innerHTML = x ? diagram(CH.voic[i]) : '';
+  $('chNext').textContent = n ? chName(n.root,n.quality,CH.notation) : '—';
+  $('chNextSub').textContent = n ? `en ${Math.max(0, n.start - t).toFixed(1).replace('.',',')} s` : '';
+  $('chNextDia').innerHTML = n ? diagram(CH.voic[nxtI], 0.8) : '';
+}
+// --- reproducción sincronizada (original + guitarra rítmica)
+function chPos(){ return CH.playing ? Math.min(CH.res.duration, lvCtx().currentTime - CH.t0 + CH.off) : CH.off; }
+function chPlay(){
+  if(!CH.res || !LV.obuf){ chMsg('Cargando el audio…'); return; }
+  stopAll('chords'); const ctx = lvCtx(); ctx.resume();
+  const mk = (buf, vol)=>{ const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; g.gain.value = vol; s.connect(g); g.connect(ctx.destination); s.start(0, CH.off); return {s, g}; };
+  CH.srcs = [Object.assign(mk(LV.obuf, +$('chVo').value), {k:'o'})];
+  if(CH.rbuf) CH.srcs.push(Object.assign(mk(CH.rbuf, +$('chVr').value), {k:'r'}));
+  CH.t0 = ctx.currentTime; CH.playing = true; $('chPlay').textContent='⏸';
+  const loop = ()=>{ if(!CH.playing) return; const t = chPos();
+    if(t >= CH.res.duration - 0.02){ chPause(); CH.off = 0; chUpdate(0); return; }
+    chUpdate(t); const tl = $('chTL'), x = t*CH.px; if(x < tl.scrollLeft + 40 || x > tl.scrollLeft + tl.clientWidth*0.7) tl.scrollLeft = x - tl.clientWidth*0.3;
+    CH.raf = requestAnimationFrame(loop); };
+  loop();
+}
+function chPause(){ if(!CH.playing) return; CH.off = chPos(); CH.playing = false; $('chPlay').textContent='▶'; CH.srcs.forEach(x=>{ try{ x.s.stop(); }catch(e){} }); CH.srcs = []; cancelAnimationFrame(CH.raf); }
+function chSeek(t){ const was = CH.playing; chPause(); CH.off = Math.max(0, Math.min(t, CH.res.duration-0.05)); chUpdate(CH.off, true); if(was) chPlay(); }
+$('chPlay').onclick = ()=>{ if(CH.playing) chPause(); else chPlay(); };
+const chVol = ()=>{ $('chVoV').textContent = Math.round($('chVo').value*100)+' %'; $('chVrV').textContent = Math.round($('chVr').value*100)+' %';
+  CH.srcs.forEach(x=>x.g.gain.setTargetAtTime(+(x.k==='o'?$('chVo'):$('chVr')).value, lvCtx().currentTime, 0.02)); };
+$('chVo').oninput = chVol; $('chVr').oninput = chVol; chVol();
+// --- corregir un acorde
+function chEditOpen(i){
+  const x = CH.segs[i]; CH.edit = i;
+  const alts = (x.alts||[]).map(a=>`<button data-r="${a.root}" data-q="${a.quality}">${chName(a.root,a.quality,CH.notation)} <span class="muted">${Math.round(a.p*100)} %</span></button>`).join('');
+  $('chEdit').innerHTML = `<b>Acorde de ${fmtT(x.start)} a ${fmtT(x.end)}:</b> ${chName(x.root,x.quality,CH.notation)} <span class="muted">(${Math.round(x.conf*100)} % seguro)</span>
+    <div class="muted" style="font-size:13px;margin-top:6px">Otras posibilidades que ha oído la app:</div><div class="alts">${alts||'<span class="muted">ninguna</span>'}<button data-r="" data-q="">Sin acorde</button></div>
+    <div class="row"><span class="muted" style="font-size:13px">O elige tú:</span>
+      <select id="chER">${(CH.flats?EF:ES).map((n,k)=>`<option value="${k}">${CH.notation==='es'?n:(CH.flats?NF:NS)[k]}</option>`).join('')}</select>
+      <select id="chEQ">${Object.keys(QSUF).map(q=>`<option value="${q}">${QNAME[q]}</option>`).join('')}</select>
+      <button class="btn small primary" id="chEOk">Aplicar</button><button class="btn small" id="chEX">Cerrar</button></div>`;
+  $('chEdit').hidden = false; if(x.root!=null){ $('chER').value = x.root; $('chEQ').value = x.quality; }
+  $('chEdit').querySelectorAll('.alts button').forEach(b=>b.onclick = ()=>chSetChord(i, b.dataset.r===''?null:+b.dataset.r, b.dataset.q||null));
+  $('chEOk').onclick = ()=>chSetChord(i, +$('chER').value, $('chEQ').value);
+  $('chEX').onclick = ()=>{ $('chEdit').hidden = true; };
+  $('chEdit').scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+async function chSetChord(i, root, q){
+  const x = CH.segs[i];
+  if(x.root!=null && !(x.alts||[]).some(a=>a.root===x.root&&a.quality===x.quality)) x.alts = [{root:x.root, quality:x.quality, label:x.label, p:x.conf}].concat(x.alts||[]).slice(0,4);
+  x.root = root; x.quality = root==null ? null : q; x.label = chLabel(root, q); x.conf = 1; x.edited = true;
+  $('chEdit').hidden = true; await chVoicings(); chTimeline(); chUpdate(chPos(), true); rhChanged();
+}
+function chDownloadTxt(){
+  const lines = ['Acordes detectados por Guitarra Flamenca', `Tonalidad: ${CH.res.key.name} · Tempo: ${Math.round(chTempo())} BPM · Compás: ${CH.meter}`,
+    CH.capo ? `Cejilla en el traste ${CH.capo}` : 'Sin cejilla', ''];
+  CH.segs.forEach((x,i)=>{ if(x.root==null) return; const v = CH.voic[i];
+    lines.push(`${fmtT(x.start).padStart(5)}  ${chName(x.root,x.quality,'es').padEnd(8)} ${chName(x.root,x.quality,'en').padEnd(7)} ${v?'['+v.frets.map(f=>f<0?'x':f).join(' ')+']  '+v.name:''}`); });
+  lines.push('', '# Formato .lab (MIREX): inicio fin acorde');
+  CH.segs.forEach(x=>lines.push(`${x.start.toFixed(3)}\t${x.end.toFixed(3)}\t${x.label}`));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/plain'}));
+  a.download = (file ? file.name.replace(/\.wav$/i,'') : 'acordes') + ' - acordes.txt'; a.click();
+}
+// --- generar la guitarra rítmica
+$('rhBtn').onclick = async ()=>{
+  if(!CH.res) return;
+  $('rhBtn').disabled = true; $('rhProgBox').style.display = 'block'; $('rhRes').hidden = true;
+  const set = (p,m)=>{ $('rhBar').style.width = p+'%'; $('rhPct').textContent = Math.round(p)+' %'; $('rhMsg').textContent = m; };
+  set(1, 'Preparando…');
+  const body = {sid: CH.sid, segments: CH.segs.map(x=>({start:x.start, end:x.end, label:x.label})), beats: CH.beats, downbeats: chDownbeats(),
+    tempo: chTempo(), tuning_cents: CH.res.tuning_cents, rhythm: rhParams(), options: options(), name: file ? file.name.replace(/\.wav$/i,'') : 'audio'};
+  const r = await fetch('/api/chords/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({error:'No se ha podido conectar con la app.'}));
+  if(r.error){ set(0, r.error); $('rhBtn').disabled = false; return; }
+  let j;
+  while(true){
+    await new Promise(r=>setTimeout(r,500));
+    j = await fetch('/api/job/'+r.id).then(r=>r.json()).catch(()=>({}));
+    if(j.status==='done' || j.status==='error') break;
+    set(j.progress||0, j.message||'Generando…');
+  }
+  $('rhBtn').disabled = false;
+  if(j.status!=='done'){ set(0, j.message||'No he podido generar la pista.'); return; }
+  set(100, '¡Guitarra rítmica lista!');
+  CH.rjob = j; j.rhythm = true;
+  const buf = await fetch(`/api/job/${j.id}/wav?t=${Date.now()}`).then(r=>r.arrayBuffer());
+  CH.rbuf = await lvCtx().decodeAudioData(buf); $('chVr').disabled = false;
+  $('rhHint').textContent = 'Pulsa ▶ arriba para oírla junto al original, sincronizada con los acordes.';
+  const i = j.info, base = '/api/job/'+j.id+'/';
+  $('rhRes').innerHTML = `<span class="chip">${i.pattern}</span><span class="chip">${i.capo?'Cejilla traste '+i.capo:'Sin cejilla'}</span><span class="chip">${i.n_notes} notas</span>
+    <a class="btn small" href="${base}wav?download=1">⬇ WAV</a><a class="btn small" href="${base}mid?download=1">⬇ MIDI</a>
+    <button class="btn small" id="rhMix">🎚 Añadir al mezclador</button><button class="btn small" id="rhSave">💾 Guardar en la carpeta</button><span class="muted" id="rhSaved" style="font-size:13px"></span>`;
+  $('rhRes').hidden = false;
+  $('rhMix').onclick = ()=>{
+    if(!MX.versions.length){ $('rhSaved').textContent = 'Convierte primero el archivo (paso 3): la pista se añadirá sola al mezclador.'; return; }
+    addTrack({id:j.id, rhythm:true, sound:j.sound, info:j.info}, 'wav', 0.8); $('rhSaved').textContent = '✓ Añadida al mezclador (paso 5).';
+  };
+  $('rhSave').onclick = async ()=>{
+    const folder = $('folder').value.trim(); if(!folder){ $('rhSaved').textContent = 'Elige una carpeta en el paso 6.'; return; }
+    const s = await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:j.id, folder, name:j.basename, formats:['wav','mid']})}).then(r=>r.json());
+    $('rhSaved').textContent = s.error ? s.error : '✓ Guardado: ' + s.saved.map(p=>p.split(/[\\/]/).pop()).join(', ');
+  };
+  if(MX.versions.length && !MX.tracks.some(t=>t.v && t.v.id===j.id)) addTrack({id:j.id, rhythm:true, sound:j.sound, info:j.info}, 'wav', 0.8);
+  if(CH.playing){ const t = chPos(); chPause(); CH.off = t; chPlay(); }
+};
 
 function init(cfg){
   CFG = cfg; $('pluginWarn').style.display = cfg.plugin_ok ? 'none' : 'block';

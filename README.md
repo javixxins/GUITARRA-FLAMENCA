@@ -15,6 +15,12 @@ sin subir nada a Internet.
 - **Reverb y ecualizador de la guitarra**, con estilos listos para usar:
   - Reverb: Seca, Estudio, Tablao, Patio andaluz, Sala de conciertos, Iglesia.
   - Ecualizador de 5 bandas: Plano, Flamenco nítido, Cálida, Con cuerpo, Brillante.
+- **Acordes y guitarra rítmica**:
+  - detecta los acordes, la tonalidad (también el modo flamenco), el tempo y el compás, y los
+    muestra en una línea de tiempo que avanza con el audio, con el diagrama de cada postura;
+  - crea una pista de guitarra flamenca rítmica que toca esos acordes sobre el mismo pulso, con
+    el rasgueo que elijas (rumba, tangos, sevillanas, bulerías, soleá…);
+  - la pista se exporta en WAV y MIDI y entra en el mezclador.
 - **Mis ajustes**: guarda toda la configuración con un nombre y vuelve a elegirla cuando quieras.
 - **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
   plugin y aplica el que más se le parece, explicando por qué. Luego puedes retocarlo.
@@ -106,6 +112,49 @@ La app se abre en el navegador en `http://127.0.0.1:8850` (o el siguiente puerto
    - Masterización: compresión suave y limitador a −1 dBFS.
 6. Se mide el **parecido armónico** con el original y se muestra en la app.
 
+### Acordes y guitarra rítmica (`acordes.py`, `guitarra_ritmica.py`)
+**Detección de acordes**, con técnicas de referencia en análisis musical que funcionan igual en
+Windows y Mac. Essentia no tiene versión para Windows, madmom no funciona con Python 3.10 y
+Chordino necesita programas externos, así que se usan sus mismas ideas:
+1. **Pulso** del original (beat tracking). El análisis se hace pulso a pulso, corrigiendo el
+   tempo si sale a la mitad.
+2. **Qué notas suenan**, de dos formas:
+   - las notas de *basic-pitch* (la red neuronal de Spotify);
+   - un espectro CQT afinado al original, blanqueado y con los armónicos separados por NNLS
+     (como NNLS-Chroma/Chordino).
+3. **Croma de bajos y croma de agudos** por separado: el bajo decide la fundamental del acorde.
+4. **Plantillas** en las 12 tonalidades: mayor, menor, 7, maj7, m7, disminuido y sus4.
+5. **Modelo de Márkov (Viterbi)**, y probabilidades por acorde para la fiabilidad y las alternativas.
+6. **Tonalidad y modo**: mayor, menor y modo flamenco o frigio (*por arriba*, *por medio*,
+   *por granaína*, *por taranta*…). Después hay una **corrección modal**: se favorecen los
+   acordes propios de la tonalidad, como la cadencia andaluza.
+7. **Compás** y primer tiempo de cada compás.
+
+Resultados con mir_eval (métricas oficiales de MIREX), en `pruebas/acordes_banco.py`:
+
+| Canciones | Mayor/menor | Con séptimas | Método sencillo (croma + plantillas) |
+|---|---|---|---|
+| 9 de ajuste | 91,6 % | 91,6 % | 78,7 % |
+| **7 nuevas, no usadas para ajustar** | **94,8 %** | **94,8 %** | 75,2 % |
+
+Las canciones son sintéticas, con guitarra real del plugin rasgueada, piano, órgano, bajo,
+melodía, batería y palmas. El tempo a veces sale al doble o a la mitad en piezas lentas o muy
+sostenidas: se corrige con los botones ×½ / ×2. Cualquier acorde se puede corregir pulsándolo.
+
+**Guitarra rítmica**:
+- **Posturas**: un diccionario de posturas flamencas (*por arriba* en Mi, *por medio* en La, Fa
+  con cuerdas al aire…) más un generador de posturas tocables para cualquier acorde: fundamental
+  en el bajo, como máximo 4 dedos o cejilla.
+- **Cejilla automática**: elige el traste con el que la canción cae en las formas más flamencas.
+  Por ejemplo, Si m - La - Sol - Fa# se toca con cejilla en el 2 y formas de La m - Sol - Fa - Mi.
+- **Conducción de voces**: la mano se mueve lo mínimo entre acordes y se prefieren las cuerdas al aire.
+- **Rasgueos**: abajo, arriba, rasgueado de 4 dedos, apagado, pulgar y arpegio, colocados sobre
+  el pulso real. Se ajustan la velocidad del rasgueo, la intensidad, los acentos, la
+  humanización, el swing, cuánto suenan las cuerdas y cuánto sigue la dinámica del original.
+- **Afinación**: sigue la del original.
+- **Comprobación**: el 97-99,6 % de las notas generadas pertenecen al acorde que suena en ese
+  momento. El resto son anticipaciones de menos de 60 ms al acorde siguiente.
+
 ### Reverb y ecualizador
 - **Reverb** de sala por convolución:
   - reflexiones tempranas con anchura estéreo y una cola difusa;
@@ -170,6 +219,8 @@ La conversión final reutiliza ese análisis y tarda la mitad.
 | `engine.py` | detección de notas y síntesis |
 | `instrument.py` | lectura del plugin |
 | `recomendar.py` | ajuste recomendado |
+| `acordes.py` | detección de acordes, tonalidad, tempo y compás |
+| `guitarra_ritmica.py` | posturas flamencas, cejilla, conducción de voces y rasgueos |
 | `index.html` | la interfaz |
 | `instalar.*`, `Iniciar…`, `Parar…` | instalar, abrir y cerrar (`.bat` en Windows, `.command` en Mac) |
 | `make_icon.py` | dibuja el icono |
