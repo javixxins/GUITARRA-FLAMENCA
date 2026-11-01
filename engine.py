@@ -373,7 +373,7 @@ def render(notes, sound_id, instrument, opts, progress, dry=False):
     sos_cache = {}
     for idx, n in enumerate(notes):
         target = n["pitch"] + transpose + tuning + (n.get("bend", 0) if follow_bends else 0)
-        stop = n["end"] + release
+        stop = n["end"] + max(0.005, float(n.get("release", release)))  # cada nota puede traer su resonancia
         if next_same.get(idx) is not None:
             stop = min(stop, next_same[idx] + 0.04)
         length = max(0.05, stop - n["start"])

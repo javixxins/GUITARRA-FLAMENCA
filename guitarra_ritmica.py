@@ -363,7 +363,122 @@ def generate(segments, voicings, beats, downbeats, params, seed=7):
         if short:
             end = min(end, t + 0.045)
         ring_max = 0.25 + 6.0 * p["ring"]
+        cut = end < t + ring_max                  # la cuerda se corta (apagado, otra pulsación, cambio)
         end = min(end, t + ring_max)
         notes.append({"start": round(t, 4), "end": round(max(end, t + 0.04), 4), "pitch": int(n),
-                      "vel": int(np.clip(round(v), 1, 127))})
+                      "vel": int(np.clip(round(v), 1, 127)), **({"release": 0.03 if short else 0.05} if cut else {})})
+    return notes
+
+
+# ---------------------------------------------------------------- copiar el ritmo del original
+
+PATTERNS = {"original": {"name": "Copiar el ritmo del original (mismo riff y pulso)", "meter": 1, "events": []},
+            **PATTERNS}
+
+
+def _string_for(pitch, capo, lo_s=0):
+    """Cuerda en la que un guitarrista tocaría esa nota (traste 0-12 desde la cejilla)."""
+    best = None
+    for s in range(lo_s, 6):
+        f = pitch - STRINGS[s] - capo
+        if 0 <= f <= 12:
+            sc = abs(f - 4)            # mejor en la zona cómoda del mástil
+            if best is None or sc < best[0]:
+                best = (sc, s)
+    return None if best is None else best[1]
+
+
+def _fold(p, lo, hi):
+    while p < lo:
+        p += 12
+    while p > hi:
+        p -= 12
+    return p
+
+
+def generate_from_original(segments, voicings, events, params, seed=7):
+    """Notas de la guitarra rítmica que repiten los golpes del original (ver ritmo_original.py)."""
+    rng = np.random.default_rng(seed)
+    p = {
+        "speed": float(params.get("strum_ms", 14)) / 1000.0,
+        "vel": 55 + 70 * float(params.get("intensity", 0.7)),
+        "accent": float(params.get("accent", 0.6)),
+        "humanize": float(params.get("humanize", 0.0)),
+        "ring": float(params.get("ring", 0.8)),
+    }
+    seg_starts = np.array([s["start"] for s in segments])
+    lens = np.diff([e["t"] for e in events]) if len(events) > 1 else np.array([0.5])
+    beat_len = float(np.clip(np.median(lens) * 2, 0.25, 1.0)) if len(lens) else 0.5
+
+    def seg_at(t):
+        i = int(np.searchsorted(seg_starts, t + 1e-4, side="right") - 1)
+        if 0 <= i < len(segments) and segments[i]["start"] - 1e-4 <= t < segments[i]["end"]:
+            return i
+        return None
+
+    ahead = 0.06
+    capo = next((v["capo"] for v in voicings if v), 0)
+    hits = []                                     # (cuerda, t, nota, vel, corta, segmento, apaga, duración propia)
+    for e in events:
+        t = max(0.0, e["t"] + rng.normal(0, 0.008 * p["humanize"]))
+        acc = (1 - p["accent"]) + p["accent"] * e["acc"]
+        i = seg_at(t + ahead)
+        v = voicings[i] if i is not None and segments[i].get("label") not in (None, "N") else None
+        kind = e["kind"]
+        end_seg = segments[i]["end"] if i is not None else t + 1.0
+        if kind in ("D", "U", "R", "X"):
+            if v is None:
+                continue
+            for s, tt, n, vel, short in strike(kind, t, v, acc, p, rng, beat_len):
+                if tt < end_seg - 0.005:
+                    hits.append((s, tt, n, vel, short, i, kind == "X", None))
+        elif kind == "P":
+            ps = e["pitches"] or ([v["notes"][0]] if v else [])
+            for pitch in ps[:1]:
+                n = _fold(pitch, 40 + capo, 57 + capo)
+                s = _string_for(n, capo) if v is None else min(
+                    (k for k, f in enumerate(v["frets"]) if f >= 0), default=0)
+                if v is not None and (n - STRINGS[s] - capo) not in range(0, 13):
+                    s = _string_for(n, capo)
+                if s is None:
+                    continue
+                hits.append((s, t, n, p["vel"] * acc, False, i, False, e["dur"]))
+        elif kind == "N" and not e["pitches"]:
+            if v is not None:                     # sin alturas claras: pinzamiento de las agudas del acorde
+                for s, tt, n, vel, short in strike("H", t, v, acc, p, rng, beat_len):
+                    hits.append((s, tt, n, vel, short, i, False, e["dur"]))
+        elif kind == "N":
+            used = set()
+            for pitch in sorted(e["pitches"], reverse=True)[:3]:
+                n = _fold(pitch, 50 + capo, 86)
+                s = _string_for(n, capo, lo_s=1)
+                while s is not None and s in used:
+                    n += 0
+                    cand = [k for k in range(1, 6) if k not in used and 0 <= n - STRINGS[k] - capo <= 12]
+                    s = cand[0] if cand else None
+                if s is None:
+                    continue
+                used.add(s)
+                hits.append((s, t + 0.004 * len(used), n, p["vel"] * acc * 0.85, False, i, False, e["dur"]))
+    hits.sort(key=lambda h: h[1])
+
+    notes = []
+    chokes = sorted({round(h[1], 3) for h in hits if h[6]})
+    for k, (s, t, n, v, short, i, _, own) in enumerate(hits):
+        nxt = next((h[1] for h in hits[k + 1:] if h[0] == s), None)
+        end = (segments[i]["end"] + 0.03) if i is not None else t + 2.0
+        if nxt is not None:
+            end = min(end, nxt)
+        ch = next((c for c in chokes if c > t + 0.02), None)
+        if ch is not None:
+            end = min(end, ch + 0.01)
+        if short:
+            end = min(end, t + 0.045)
+        if own is not None:                       # notas sueltas: la misma duración que en el original
+            end = min(end, t + max(0.08, own * 1.05))
+        ring_max = 0.25 + 6.0 * p["ring"]
+        cut = end < ring_max + t
+        end = min(end, t + ring_max)
+        notes.append({"start": round(t, 4), "end": round(max(end, t + 0.04), 4), "pitch": int(n),
+                      "vel": int(np.clip(round(v), 1, 127)), **({"release": 0.03 if short else 0.06} if cut else {})})
     return notes

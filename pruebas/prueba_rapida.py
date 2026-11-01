@@ -166,6 +166,15 @@ def main():
     ra, rsr = sf.read(io.BytesIO(c.get(f"/api/job/{rj['id']}/wav").data))
     check(ra.ndim == 2 and len(ra) / rsr > 4 and np.isfinite(ra).all() and np.abs(ra).max() > 0.05, f"WAV de {len(ra) / rsr:.1f} s")
     check(c.get(f"/api/job/{rj['id']}/mid").data[:4] == b"MThd", "MIDI de la guitarra rítmica")
+    ev = cr.get("events") or []
+    check(len(ev) >= 3, f"golpes del original: {len(ev)} ({', '.join(sorted({e['kind'] for e in ev}))})")
+    ro = c.post("/api/chords/render", json={"sid": pid, "segments": cr["segments"], "beats": cr["beats"],
+                                           "downbeats": cr["downbeats"], "tempo": cr["tempo"], "name": "prueba",
+                                           "tuning_cents": cr["tuning_cents"], "rhythm": {"pattern": "original"},
+                                           "options": {"sound": "estudio"}}).get_json()
+    while (rjo := c.get(f"/api/job/{ro['id']}").get_json())["status"] not in ("done", "error"):
+        time.sleep(0.3)
+    check(rjo["status"] == "done", f"guitarra rítmica copiando el ritmo del original ({rjo.get('info', {}).get('n_notes')} notas)")
 
     print("4. Conversión (reutiliza el análisis de la preescucha)")
     t0 = time.time()

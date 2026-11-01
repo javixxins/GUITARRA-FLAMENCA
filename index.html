@@ -136,6 +136,9 @@ canvas{width:100%;height:190px;background:#0d0907;border:1px solid var(--line);b
 .tlbar{position:absolute;top:0;bottom:0;width:1px;background:rgba(232,184,120,.45)}
 .tlbar span{position:absolute;top:3px;left:3px;font-size:10px;color:var(--muted)}
 .tlbeat{position:absolute;top:14px;height:6px;width:1px;background:rgba(232,184,120,.25)}
+.tlev{position:absolute;bottom:2px;width:3px;border-radius:2px;pointer-events:none;opacity:.9}
+.tllegend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);margin-top:6px}
+.tllegend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .tlhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 8px #fff;pointer-events:none}
 .chedit{margin-top:10px;background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:12px}
 .chedit .alts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
@@ -316,7 +319,8 @@ body.haslive main{padding-bottom:150px}
         </div>
       </div>
       <div class="tl" id="chTL"><div class="tlin" id="chTLin"></div></div>
-      <div class="hint">Pulsa la línea de tiempo para ir a ese momento, o un acorde para corregirlo. Las rayas indican acordes menos seguros.</div>
+      <div class="tllegend" id="chLegend"></div>
+      <div class="hint">Pulsa la línea de tiempo para ir a ese momento, o un acorde para corregirlo. Las rayas indican acordes menos seguros. Las marcas de abajo son los golpes del original (altura = acento).</div>
       <div class="chedit" id="chEdit" hidden></div>
 
       <details open style="margin-top:14px">
@@ -325,7 +329,7 @@ body.haslive main{padding-bottom:150px}
       </details>
       <div class="go" style="margin-top:14px">
         <button class="btn primary big" id="rhBtn">🎸 Generar guitarra rítmica</button>
-        <span class="muted" id="rhHint">Usa el sonido, la reverb y el ecualizador elegidos arriba.</span>
+        <span class="muted" id="rhHint">Por defecto copia el ritmo del original: los mismos golpes, acentos, apagados y punteos, con los acordes detectados. Usa el sonido, la reverb y el ecualizador elegidos arriba.</span>
       </div>
       <div id="rhProgBox" style="display:none">
         <div class="bar"><div id="rhBar"></div></div>
@@ -1040,7 +1044,7 @@ const ES = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'],
 const QSUF = {maj:'', min:'m', '7':'7', maj7:'maj7', min7:'m7', dim:'dim', sus4:'sus4'};
 const QNAME = {maj:'mayor', min:'menor', '7':'séptima', maj7:'séptima mayor', min7:'menor séptima', dim:'disminuido', sus4:'suspendido 4ª'};
 const RH = [
-  {k:'pattern', l:'Patrón de rasgueo', type:'select', opts:[], v:'rumba'},
+  {k:'pattern', l:'Patrón de rasgueo', type:'select', opts:[], v:'original'},
   {k:'strum_ms', l:'Velocidad del rasgueo', min:4, max:40, step:1, v:14, f:v=>v+' ms entre cuerdas', s:'Menos = rasgueo más seco y rápido'},
   {k:'intensity', l:'Intensidad', min:0, max:1, step:.05, v:.7, f:v=>Math.round(v*100)+' %'},
   {k:'accent', l:'Acentos del compás', min:0, max:1, step:.05, v:.6, f:v=>Math.round(v*100)+' %', s:'Cuánto se marcan los golpes fuertes'},
@@ -1090,6 +1094,8 @@ async function chStart(){
     CH.segs = st.result.segments.map(x=>Object.assign({}, x));
     $('chProg').hidden = true; $('chMain').hidden = false;
     await chVoicings(); chTop(); chTimeline(); chUpdate(0);
+    const cnt = {}; (CH.res.events||[]).forEach(e=>cnt[e.kind]=(cnt[e.kind]||0)+1);
+    $('chLegend').innerHTML = `<span>Golpes del original (${(CH.res.events||[]).length}):</span>` + Object.keys(EVC).filter(k=>cnt[k]).map(k=>`<span><i style="background:${EVC[k]}"></i>${EVN[k]} ${cnt[k]}</span>`).join('');
     return;
   }
 }
@@ -1118,6 +1124,8 @@ async function chVoicings(){
   const r = await fetch('/api/chords/voicings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({labels, durs, capo:p.capo, flavor:p.flavor})}).then(r=>r.json()).catch(()=>({}));
   if(r.voicings){ CH.voic = r.voicings; CH.capo = r.capo; if($('chCapo')) $('chCapo').textContent = CH.capo ? 'traste '+CH.capo : 'sin cejilla'; chUpdate(chPos(), true); }
 }
+const EVC = {D:'#ffffff', U:'#9fd3ff', R:'#ff7b5c', X:'#c9a0ff', P:'#ffd166', N:'#7ee0a1'};
+const EVN = {D:'Rasgueo abajo', U:'Rasgueo arriba', R:'Rasgueado de dedos', X:'Apagado', P:'Pulgar (bajo)', N:'Notas punteadas'};
 function chColor(root, q){ if(root==null) return '#2a211b'; const h = (root*30+20)%360; const l = q==='min'||q==='min7' ? 58 : q==='dim' ? 50 : 66; return `hsl(${h} 55% ${l}%)`; }
 function chTimeline(){
   const dur = CH.res.duration, W = Math.max(dur*CH.px, $('chTL').clientWidth);
@@ -1129,6 +1137,7 @@ function chTimeline(){
     const w = Math.max(2,(x.end-x.start)*CH.px-2);
     h += `<div class="tlb ${x.root==null?'nc':''} ${x.conf<0.55?'low':''}" data-i="${i}" style="left:${x.start*CH.px+1}px;width:${w}px;background:${chColor(x.root,x.quality)}" title="${chName(x.root,x.quality,'es')} (${chName(x.root,x.quality,'en')}) · ${Math.round(x.conf*100)} % seguro">${x.root==null?'—':chName(x.root,x.quality,CH.notation)}<small>${x.root==null?'':Math.round(x.conf*100)+' %'}</small></div>`;
   });
+  (CH.res.events||[]).forEach(e=>{ h += `<div class="tlev" style="left:${e.t*CH.px-1}px;height:${Math.round(4+10*e.acc)}px;background:${EVC[e.kind]||'#fff'}" title="${EVN[e.kind]||e.kind} · acento ${Math.round(e.acc*100)} %"></div>`; });
   h += `<div class="tlhead" id="chHead" style="left:${CH.off*CH.px}px"></div>`;
   inn.innerHTML = h;
   inn.querySelectorAll('.tlb').forEach(el=>el.onclick = e=>{ e.stopPropagation(); chEditOpen(+el.dataset.i); });

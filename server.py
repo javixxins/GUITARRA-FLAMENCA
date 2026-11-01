@@ -29,6 +29,7 @@ import instrument
 import recomendar
 import acordes
 import guitarra_ritmica
+import ritmo_original
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(HERE, "trabajos")
@@ -526,7 +527,14 @@ def api_chords(sid):
 
     def work():
         try:
-            st["result"] = acordes.detect(sess["path"], prep, progress)
+            res = acordes.detect(sess["path"], prep, lambda p, m: progress(p * 0.85, m))
+            progress(88, "Escuchando el ritmo del original (golpes y acentos)…")
+            try:
+                res["events"] = ritmo_original.extract(prep, res["beats"])
+            except Exception:
+                traceback.print_exc()
+                res["events"] = []
+            st["result"] = res
             st["status"] = "done"
         except Exception as e:
             traceback.print_exc()
@@ -592,7 +600,14 @@ def api_chords_render():
                                                 rh.get("capo", "auto"), flavor)
             vo = guitarra_ritmica.voice_lead(labels, capo, flavor)
             progress(8, "Colocando el rasgueo sobre el pulso del original…")
-            notes = guitarra_ritmica.generate(segs, vo, data.get("beats") or [], data.get("downbeats") or [], rh)
+            if rh.get("pattern") == "original":
+                events = ((sess.get("chords") or {}).get("result") or {}).get("events") or []
+                if not events:
+                    raise ValueError("No he encontrado golpes en el original: elige un patrón de rasgueo.")
+                progress(8, "Copiando los golpes, acentos y apagados del original…")
+                notes = guitarra_ritmica.generate_from_original(segs, vo, events, rh)
+            else:
+                notes = guitarra_ritmica.generate(segs, vo, data.get("beats") or [], data.get("downbeats") or [], rh)
             if not notes:
                 raise ValueError("No ha salido ninguna nota: revisa los acordes.")
             dyn = float(rh.get("dyn", 0.4))

@@ -18,8 +18,9 @@ sin subir nada a Internet.
 - **Acordes y guitarra rítmica**:
   - detecta los acordes, la tonalidad (también el modo flamenco), el tempo y el compás, y los
     muestra en una línea de tiempo que avanza con el audio, con el diagrama de cada postura;
-  - crea una pista de guitarra flamenca rítmica que toca esos acordes sobre el mismo pulso, con
-    el rasgueo que elijas (rumba, tangos, sevillanas, bulerías, soleá…);
+  - crea una pista de guitarra flamenca rítmica que toca esos acordes **copiando el ritmo del
+    original**: los mismos golpes, acentos, apagados, pulgar y punteos. También puede usar un
+    patrón de rasgueo (rumba, tangos, sevillanas, bulerías, soleá…);
   - la pista se exporta en WAV y MIDI y entra en el mezclador.
 - **Mis ajustes**: guarda toda la configuración con un nombre y vuelve a elegirla cuando quieras.
 - **Ajuste recomendado**: la app analiza la onda del original, prueba los sonidos y ajustes del
@@ -141,6 +142,30 @@ Las canciones son sintéticas, con guitarra real del plugin rasgueada, piano, ó
 melodía, batería y palmas. El tempo a veces sale al doble o a la mitad en piezas lentas o muy
 sostenidas: se corrige con los botones ×½ / ×2. Cualquier acorde se puede corregir pulsándolo.
 
+**Copiar el ritmo del original** (`ritmo_original.py`, el modo por defecto):
+1. **Golpes**: se detectan con funciones de ataque que solo reaccionan a sonidos con altura (el
+   flujo del espectro CQT y los comienzos de nota de basic-pitch). La batería y las palmas no
+   cuentan. Las cuerdas escalonadas de un rasgueo se juntan en un solo golpe.
+2. **Cada golpe se describe** con su acento (energía), cuánto sube el registro grave y el agudo,
+   cuánto se apaga después y qué notas nuevas suenan.
+3. **Se traduce a técnica de guitarra**:
+   - rasgueo abajo o arriba;
+   - rasgueado de dedos;
+   - apagado (cae más de 12 dB en 0,15 s);
+   - pulgar (solo sube el grave);
+   - notas punteadas (solo sube el agudo): las mismas notas, para conservar la melodía del riff.
+4. **Se toca con las posturas del acorde de cada momento**, en el instante exacto del original.
+
+Resultados en `pruebas/ritmo_banco.py`: 5 riffs de guitarra del plugin y de piano, con batería
+o palmas; mir_eval de ataques con margen de 50 ms.
+
+| Medida | Resultado |
+|---|---|
+| Golpes del original encontrados | F1 0,87 |
+| Golpes de la pista generada que coinciden con el original | **F1 0,84** (con un patrón fijo: 0,25-0,30) |
+| Acentos | correlación 0,53 |
+| Tipo de golpe | 65 % (el rasgueado de dedos rápido es el que peor se reconoce) |
+
 **Guitarra rítmica**:
 - **Posturas**: un diccionario de posturas flamencas (*por arriba* en Mi, *por medio* en La, Fa
   con cuerdas al aire…) más un generador de posturas tocables para cualquier acorde: fundamental
@@ -221,6 +246,7 @@ La conversión final reutiliza ese análisis y tarda la mitad.
 | `recomendar.py` | ajuste recomendado |
 | `acordes.py` | detección de acordes, tonalidad, tempo y compás |
 | `guitarra_ritmica.py` | posturas flamencas, cejilla, conducción de voces y rasgueos |
+| `ritmo_original.py` | golpes, acentos y técnica del original para copiar su ritmo |
 | `index.html` | la interfaz |
 | `instalar.*`, `Iniciar…`, `Parar…` | instalar, abrir y cerrar (`.bat` en Windows, `.command` en Mac) |
 | `make_icon.py` | dibuja el icono |
